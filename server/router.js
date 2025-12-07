@@ -1,57 +1,84 @@
 import path from "path";
-import { fileURLToPath, pathToFileURL } from "url";
+import { fileURLToPath } from "url";
 import { renderTemplate } from "./utils/template.js";
 import { renderServerComponents } from "./utils/ssr.js";
 import { errorRoute, notFoundRoute } from "./_app/routes.js";
+import fs from "fs/promises";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PAGES_DIR = path.resolve(__dirname, "..", "pages");
 
-/**
- * Renderiza una página completa con layout
- */
-async function renderPage(pageName, data, metadata) {
-  const templateFile = "template.html";
-  const templatePath = path.resolve(
-    __dirname,
-    "..",
-    "pages",
-    pageName,
-    templateFile
-  );
+const DEFAULT_METADATA = {
+  title: "My SSR Site",
+  description: "Default description",
+};
 
-  let pageHtml = renderTemplate(templatePath, data);
-  pageHtml = await renderServerComponents(pageHtml);
+const FALLBACK_ERROR_HTML = `
+  <!DOCTYPE html>
+  <html>
+  <head><title>Error 500</title></head>
+  <body>
+    <h1>Error 500 - Internal Server Error</h1>
+    <p>An unexpected error has occurred.</p>
+    <p><a href="/">Back to home</a></p>
+  </body>
+  </html>
+`;
 
-  const layoutPath = path.resolve(__dirname, "../pages/layout.html");
-  return renderTemplate(layoutPath, {
-    children: pageHtml,
-    metadata: {
-      title: metadata?.title || "Mi Sitio SSR",
-      description: metadata?.description || "Descripción por defecto",
-    },
-  });
+/** Builds the path to a page file */
+const getPagePath = (pageName, file = "page.html") =>
+  path.resolve(PAGES_DIR, pageName, file);
+
+/** Sends HTML response to client */
+const sendResponse = (res, statusCode, html) => {
+  res.writeHead(statusCode, { "Content-Type": "text/html" });
+  res.end(html);
+};
+
+/** Extracts server script, client script from HTML page */
+function extractPageScripts(pageContent) {
+  // Extract server-side script
+  const serverMatch = pageContent.match(/<script server>([\s\S]*?)<\/script>/);
+  // Extract client-side script:
+  const clientMatch = pageContent.match(/<script client>([\s\S]*?)<\/script>/);
+
+  let getData = null;
+  let metadata = {};
+  const clientCode = clientMatch ? clientMatch[1].trim() : "";
+
+  if (serverMatch) {
+    try {
+      // Remove import statements (they can't run in new Function)
+      const cleanedScript = serverMatch[1]
+        .replace(/import\s+.*?;?\n?/g, "")
+        .trim();
+
+      const moduleCode = `
+        ${cleanedScript}
+        return { 
+          getData: typeof getData !== 'undefined' ? getData : null, 
+          metadata: typeof metadata !== 'undefined' ? metadata : {} 
+        };
+      `;
+      const result = new Function(moduleCode)();
+      getData = result.getData;
+      metadata = result.metadata;
+    } catch (error) {
+      console.warn(`Error evaluating server script: ${error.message}`);
+    }
+  }
+
+  return { getData, metadata, clientCode };
 }
 
-/**
- * Carga el template y extrae datos y metadatos
- */
+/** Loads page and extracts data, metadata and client code */
 async function loadPageTemplate(pageName, additionalData = null) {
-  const templatePath = path.resolve(
-    __dirname,
-    "..",
-    "pages",
-    pageName,
-    "template.html"
-  );
-
   try {
-    const templateContent = await fs.readFile(templatePath, "utf-8");
-    const { getData, metadata } = await extractTemplateScript(templateContent);
-
-    const data = getData ? await getData(additionalData) : {};
-
-    return { data, metadata };
+    const templateContent = await fs.readFile(getPagePath(pageName), "utf-8");
+    const { getData, metadata, clientCode } =
+      extractPageScripts(templateContent);
+    const data = (await getData?.(additionalData)) ?? {};
+    return { data, metadata, clientCode };
   } catch (error) {
     throw new Error(
       `Could not load template for page "${pageName}": ${error.message}`
@@ -59,53 +86,44 @@ async function loadPageTemplate(pageName, additionalData = null) {
   }
 }
 
-/**
- * Carga y ejecuta el módulo de una página
- */
-async function loadPageModule(pageName, additionalData = null) {
-  const pagePath = path.resolve(__dirname, "..", "pages", pageName, "page.js");
-  const pageModule = await import(pathToFileURL(pagePath).href);
-
-  const data = pageModule.getData
-    ? await pageModule.getData(additionalData)
-    : {};
-
-  return {
-    data,
-    metadata: pageModule.metadata,
-  };
+/** Generates client script tag with module type */
+function generateClientScriptTag(clientCode) {
+  if (!clientCode) return "";
+  return `<script type="module">\n${clientCode}\n</script>`;
 }
 
-/**
- * Envía respuesta HTML al cliente
- */
-function sendResponse(res, statusCode, html) {
-  res.writeHead(statusCode, { "Content-Type": "text/html" });
-  res.end(html);
+/** Renders a complete page with layout */
+async function renderPage(pageName, data, metadata = {}, clientCode = "") {
+  let pageHtml = renderTemplate(getPagePath(pageName), data);
+  pageHtml = await renderServerComponents(pageHtml);
+
+  const clientScripts = generateClientScriptTag(clientCode);
+
+  return renderTemplate(path.resolve(PAGES_DIR, "layout.html"), {
+    children: pageHtml,
+    clientScripts,
+    metadata: { ...DEFAULT_METADATA, ...metadata },
+  });
 }
 
-/**
- * Genera HTML de fallback para errores críticos
- */
-function getFallbackErrorHtml() {
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head><title>Error 500</title></head>
-    <body>
-      <h1>Error 500 - Internal Server Error</h1>
-      <p>Ha ocurrido un error inesperado.</p>
-      <p><a href="/">Volver al inicio</a></p>
-    </body>
-    </html>
-  `;
+/** Renders and sends a page */
+async function renderAndSend(
+  res,
+  pageName,
+  statusCode = 200,
+  additionalData = null
+) {
+  const { data, metadata, clientCode } = await loadPageTemplate(
+    pageName,
+    additionalData
+  );
+  const html = await renderPage(pageName, data, metadata, clientCode);
+  sendResponse(res, statusCode, html);
 }
 
 export async function handlePageRequest(req, res, route) {
   if (!route) {
-    res.writeHead(404);
-    handlePageRequest(req, res, notFoundRoute);
-    return;
+    return handlePageRequest(req, res, notFoundRoute);
   }
 
   if (route === errorRoute.path) {
@@ -115,30 +133,21 @@ export async function handlePageRequest(req, res, route) {
   const pageName = route.path.slice(1);
 
   try {
-    // Cargar y renderizar página normal
-    const { data, metadata } = await loadPageModule(pageName);
-    const html = await renderPage(pageName, data, metadata);
-
-    sendResponse(res, 200, html);
+    await renderAndSend(res, pageName);
   } catch (e) {
-    // Datos del error
     const errorData = {
-      message: e.message || "Error interno del servidor",
+      message: e.message || "Internal server error",
       code: 500,
-      details: "No se pudo cargar la página solicitada",
+      details: "Could not load the requested page",
       path: route.path,
       stack: e.stack,
     };
 
     try {
-      // Intentar renderizar la página de error
-      const { data: errorPageData, metadata: errorMetadata } =
-        await loadPageModule("error", errorData);
-      const errorHtml = await renderPage("error", errorPageData, errorMetadata);
-
-      sendResponse(res, 500, errorHtml);
-    } catch (errorPageError) {
-      sendResponse(res, 500, getFallbackErrorHtml());
+      await renderAndSend(res, "error", 500, errorData);
+    } catch (err) {
+      console.error(`Failed to render error page: ${err.message}`);
+      sendResponse(res, 500, FALLBACK_ERROR_HTML);
     }
   }
 }

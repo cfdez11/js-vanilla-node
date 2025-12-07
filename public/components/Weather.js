@@ -37,10 +37,12 @@ const weatherCodes = {
 
 export class Weather extends Component {
   // Estado reactivo
-  weatherData = reactive(null);
-  loading = reactive(true);
-  error = reactive(null);
-  selectedCity = reactive("Madrid");
+  state = reactive({
+    status: "idle", // idle | loading | success | error
+    data: null,
+    error: null,
+    selectedCity: "Madrid",
+  });
 
   // Ciudades disponibles
   cities = {
@@ -57,21 +59,19 @@ export class Weather extends Component {
 
     // Effect que se ejecuta cuando cambia la ciudad seleccionada
     effect(() => {
-      if (this.selectedCity.value) {
-        this.fetchWeather(this.selectedCity.value);
+      if (this.state.selectedCity) {
+        this.fetchWeather(this.state.selectedCity);
       }
     });
   }
 
   async fetchWeather(cityName) {
-    this.loading.value = true;
-    this.error.value = null;
+    this.state.status = "loading";
+    this.state.error = null;
 
     try {
       const city = this.cities[cityName];
       if (!city) throw new Error(`Ciudad ${cityName} no encontrada`);
-
-      console.log(`🌤️ Fetching weather for ${cityName}...`);
 
       const url =
         "https://api.open-meteo.com/v1/forecast?" +
@@ -90,7 +90,7 @@ export class Weather extends Component {
       const response = await fetch(url);
 
       if (!response.ok) {
-        throw new Error(`API Error: ${response.status}`);
+        throw new Error(`API Error: adasds`);
       }
 
       const data = await response.json();
@@ -137,19 +137,18 @@ export class Weather extends Component {
         lastUpdated: new Date().toLocaleString("es-ES"),
       };
 
-      console.log(`✅ Weather data loaded for ${cityName}`);
-      this.weatherData.value = processedData;
+      this.state.data = processedData;
+      this.state.status = "success";
     } catch (err) {
-      console.error(`❌ Error fetching weather:`, err);
-      this.error.value = err.message;
-      this.weatherData.value = null;
-    } finally {
-      this.loading.value = false;
+      console.warn("Error fetching weather data:", err);
+      this.state.status = "error";
+      this.state.error = err.message;
+      this.state.data = null;
     }
   }
 
   changeCity(cityName) {
-    this.selectedCity.value = cityName;
+    this.state.selectedCity = cityName;
   }
 
   getWeatherInfo(code) {
@@ -164,7 +163,7 @@ export class Weather extends Component {
 
   render() {
     // Loading state
-    if (this.loading.value) {
+    if (this.state.status === "loading" || this.state.status === "idle") {
       return html`
         <div class="flex items-center justify-center py-12">
           <div class="text-center space-y-4">
@@ -178,16 +177,16 @@ export class Weather extends Component {
     }
 
     // Error state
-    if (this.error.value) {
+    if (this.state.status === "error") {
       return html`
         <div class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
           <div class="text-red-500 text-4xl mb-4">❌</div>
           <h3 class="text-red-800 font-bold text-lg mb-2">
             Error al cargar el clima
           </h3>
-          <p class="text-red-600 mb-4">${this.error.value}</p>
+          <p class="text-red-600 mb-4">${this.state.error}</p>
           <button
-            @click="${() => this.fetchWeather(this.selectedCity.value)}"
+            @click="${() => this.fetchWeather(this.state.selectedCity)}"
             class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
           >
             Reintentar
@@ -196,7 +195,7 @@ export class Weather extends Component {
       `;
     }
 
-    const weather = this.weatherData.value;
+    const weather = this.state.data;
     if (!weather)
       return html`<div class="text-center py-12">
         No hay datos disponibles
@@ -226,7 +225,7 @@ export class Weather extends Component {
                   <button
                     @click="${() => this.changeCity(city)}"
                     class="px-3 py-2 rounded-lg text-sm font-medium transition-all ${this
-                      .selectedCity.value === city
+                      .state.selectedCity === city
                       ? "bg-white text-blue-600"
                       : "bg-blue-600 hover:bg-blue-700 text-white"}"
                   >

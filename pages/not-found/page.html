@@ -1,7 +1,12 @@
+<script>
+  export const metadata = {
+    title: "404 - Page not found | Vanilla JS",
+    description: "The page you are looking for does not exist.",
+  };
+</script>
 <template>
   <div class="flex items-center justify-center min-h-[60vh]">
     <div class="max-w-md w-full space-y-8 text-center">
-      <!-- 404 Illustration -->
       <div class="mx-auto">
         <div class="text-9xl font-extrabold text-blue-600 animate-pulse">
           404
@@ -10,43 +15,37 @@
           🔍
         </div>
       </div>
-
-      <!-- Error Message -->
       <div class="space-y-4">
         <h1 class="text-3xl font-bold text-gray-900">
-          ¡Oops! Página no encontrada
+          Oops! Page not found
         </h1>
         <p class="text-lg text-gray-600 max-w-sm mx-auto">
-          La página que estás buscando no existe o ha sido movida a otro lugar.
+          The page you're looking for doesn't exist or has been moved to another location.
         </p>
       </div>
-
-      <!-- Action Buttons -->
       <div class="space-y-4">
         <div class="flex flex-col sm:flex-row gap-3 justify-center">
           <a href="/"
             class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 no-underline">
-            🏠 Ir al inicio
+            🏠 Go home
           </a>
 
           <button onclick="history.back()"
             class="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
-            ⬅️ Volver atrás
+            ⬅️ Go back
           </button>
         </div>
-
-        <!-- Popular Links -->
         <div class="mt-8">
-          <p class="text-sm text-gray-500 mb-3">O puedes visitar:</p>
+          <p class="text-sm text-gray-500 mb-3">Or you can visit:</p>
           <div class="flex flex-wrap justify-center gap-2">
             <a href="/meteo-ssr"
               class="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors duration-200">
-              🌤️ Clima SSR
+              🌤️ Weather SSR
             </a>
             <span class="text-gray-300">•</span>
             <a href="/meteo-csr"
               class="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors duration-200">
-              🌤️ Clima CSR
+              🌤️ Weather CSR
             </a>
             <span class="text-gray-300">•</span>
             <a href="/"
@@ -55,14 +54,6 @@
             </a>
           </div>
         </div>
-      </div>
-
-      <!-- Fun Message -->
-      <div class="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <p class="text-sm text-blue-700">
-          <span class="font-medium">💡 Tip:</span>
-          Verifica la URL o usa la navegación para encontrar lo que buscas.
-        </p>
       </div>
     </div>
   </div>

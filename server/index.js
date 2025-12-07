@@ -12,11 +12,9 @@ const app = express();
 app.use("/public", express.static(path.join(__dirname, "../public")));
 
 const registerSSRRoutes = (app, routes) => {
-  routes
-    .filter((route) => route.meta?.ssr)
-    .forEach((route) => {
-      app.get(route.path, (req, res) => handlePageRequest(req, res, route));
-    });
+  routes.forEach((route) => {
+    app.get(route.path, (req, res) => handlePageRequest(req, res, route));
+  });
 };
 
 registerSSRRoutes(app, routes);
@@ -29,5 +27,5 @@ app.use((req, res) => {
 });
 
 app.listen(3000, () => {
-  console.log("Servidor SSR corriendo en http://localhost:3000");
+  console.log("Server running in http://localhost:3000");
 });

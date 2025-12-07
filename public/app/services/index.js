@@ -1,5 +1,4 @@
-import { Router } from "./services/Router.js";
-import "../components/counter.js";
+import { Router } from "./navigation.js";
 
 window.app = {
   Router,

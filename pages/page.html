@@ -1,12 +1,18 @@
-<script>
-  export async function getData () {
+<script server>
+  import '../public/components/counter.js';
+
+  async function getData () {
     return { userId: 123, name: "Alice" };
   }
 
-  export const metadata = {
+  const metadata = {
     title: "Home",
     description: "Welcome to the home page",
   };
+</script>
+
+<script client>
+  import "/public/components/Counter.js";
 </script>
 
 <template>

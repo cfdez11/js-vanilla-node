@@ -1,7 +1,7 @@
-import { reactive } from "../app/services/reactive.js";
 import { Component } from "../app/services/Component.js";
-import { html } from "../app/services/html.js";
 import { defineComponent } from "../app/services/decorators.js";
+import { html } from "../app/services/html.js";
+import { reactive } from "../app/services/reactive.js";
 
 export class Counter extends Component {
   counter = reactive(parseInt(this.getAttribute("start") || "0"));
