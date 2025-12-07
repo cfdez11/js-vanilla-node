@@ -1,4 +1,6 @@
-export default async function UserCard({ userId }) {
+export default async function UserCardDelayed({ userId }) {
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
   const userDetails = {
     id: userId,
     name: `User ${userId}`,

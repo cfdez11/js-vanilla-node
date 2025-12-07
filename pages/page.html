@@ -18,8 +18,14 @@
 <template>
   <p>This page contains:</p>
 
-  <p>Server-rendered dynamic content:</p>
-  <s-user-card server user-id="{{userId}}"></s-user-card>
+  <p>Server-rendered component, without suspense (all the page will wait until all server components without suspense
+    are ready):</p>
+  <s-user-card userId="{{userId}}"></s-user-card>
+
+  <p>Server-rendered component with suspense (partial pre-rendering):</p>
+  <suspense fallback="<s-user-card-skeleton></s-user-card-skeleton>">
+    <s-user-card-delayed userId="{{userId}}"></s-user-card-delayed>
+  </suspense>
 
   <p>Client-rendered interactive content:</p>
   <c-counter start="5"></c-counter>
