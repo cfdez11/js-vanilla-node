@@ -137,12 +137,11 @@ async function loadPageTemplate(pageName, additionalData = null) {
  */
 function generateClientScriptTag(clientCode) {
   if (!clientCode) return "";
-  return `<script type="module">\n${clientCode}\n</script>`;
+  return `<script type="module" async>\n${clientCode}\n</script>`;
 }
 
 /** Renders a complete page with layout - returns initial HTML and suspense components */
 /**
- *
  * @param {string} pageName
  * @param {any} data
  * @param {object} metadata
