@@ -1,0 +1,37 @@
+import { Component } from "../app/services/component.js";
+import { defineComponent } from "../app/services/decorators.js";
+import { html } from "../app/services/html.js";
+import "./Weather.js";
+
+export class ClientSidePage extends Component {
+  render() {
+    return html`
+      <div class="max-w-6xl mx-auto px-4 py-8">
+        <header class="mb-12 text-center">
+          <div
+            class="inline-block bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-semibold mb-4"
+          >
+            ⚡ Client-Side Rendering (CSR)
+          </div>
+          <h1 class="text-4xl font-bold mb-4">Weather Dashboard</h1>
+          <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+            The page loads immediately and data is fetched dynamically from the
+            browser using reactive components.
+          </p>
+          <div
+            class="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg inline-block"
+          >
+            <p class="text-sm text-green-800">
+              ⚡ <strong>Note:</strong> This page loaded instantly! Data is
+              fetched asynchronously on the client after the page renders.
+            </p>
+          </div>
+        </header>
+
+        <c-weather></c-weather>
+      </div>
+    `;
+  }
+}
+
+defineComponent("csr-page")(ClientSidePage);

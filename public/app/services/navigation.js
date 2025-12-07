@@ -1,4 +1,4 @@
-import { MeteoPage } from "../../components/meteo-page.js";
+import { ClientSidePage } from "../../components/csr-page.js";
 
 // Notes: In future, we can add this routes automatically when we build the project, getting the info from pages directory
 export const routes = [
@@ -10,15 +10,15 @@ export const routes = [
     },
   },
   {
-    path: "/meteo-csr",
-    component: MeteoPage,
+    path: "/page-csr",
+    component: ClientSidePage,
     meta: {
       ssr: false,
       requiresAuth: false,
     },
   },
   {
-    path: "/meteo-ssr",
+    path: "/page-ssr",
     meta: {
       ssr: true,
       requiresAuth: false,

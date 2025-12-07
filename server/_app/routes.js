@@ -8,14 +8,14 @@ export const routes = [
     },
   },
   {
-    path: "/meteo-csr",
+    path: "/page-csr",
     meta: {
       ssr: false,
       requiresAuth: false,
     },
   },
   {
-    path: "/meteo-ssr",
+    path: "/page-ssr",
     meta: {
       ssr: true,
       requiresAuth: false,

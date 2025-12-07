@@ -37,6 +37,9 @@ export class Component extends HTMLElement {
         effect(() => this._render());
       }
     });
+
+    // Add contents display style to avoid extra wrapper elements in layout that block layout styles to the children
+    this.style.display = "contents";
   }
 
   /**

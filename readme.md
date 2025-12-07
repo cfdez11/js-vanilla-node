@@ -314,6 +314,7 @@ pnpm format       # Format code with Biome
 
 Future features planned for implementation:
 
+- [ ] **Language sintaxis** - Unify sintaxis to use same conditional tags, lists, etc in server and client.
 - [ ] **Static Incremental Regeneration** - Regenerate static pages on-demand
 - [ ] **Generate Static Params** - Pre-generate pages with dynamic routes at build time
 - [ ] **Cache getData** - Implement caching layer for data fetching functions
@@ -323,3 +324,4 @@ Future features planned for implementation:
 - [ ] **Restructure Directories** - Optimize project structure and organization
 - [ ] **Authentication** - Built-in authentication system with middleware support
 - [ ] **Auto-generated Files** - Automatic generation of routes, utility files, and configurations
+- [ ] **Layouts** - Layouts inside sub routes

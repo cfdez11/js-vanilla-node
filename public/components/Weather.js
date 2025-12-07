@@ -204,19 +204,21 @@ export class Weather extends Component {
     const currentWeather = this.getWeatherInfo(weather.current.weatherCode);
 
     return html`
-      <div class="max-w-6xl mx-auto space-y-6">
+      <div class="space-y-8">
         <!-- Header con selector de ciudad -->
         <div
-          class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white"
+          class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white shadow-lg"
         >
           <div
             class="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
           >
             <div>
-              <h1 class="text-3xl font-bold mb-2">
-                Clima en ${weather.location.name}
-              </h1>
-              <p class="text-blue-100">Actualizado: ${weather.lastUpdated}</p>
+              <h2 class="text-3xl font-bold mb-2">
+                🌤️ Weather in ${weather.location.name}
+              </h2>
+              <p class="text-blue-100">
+                Data loaded from client (real-time API)
+              </p>
             </div>
 
             <div class="flex flex-wrap gap-2">
@@ -237,139 +239,79 @@ export class Weather extends Component {
           </div>
         </div>
 
-        <!-- Clima actual -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <!-- Temperatura principal -->
-          <div
-            class="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500"
-          >
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-gray-500 text-sm font-medium">Temperatura</p>
-                <p class="text-3xl font-bold text-gray-800">
-                  ${weather.current.temperature}°C
-                </p>
-                <p class="text-gray-400 text-sm">
-                  Sensación: ${weather.current.apparentTemperature}°C
-                </p>
-              </div>
-              <div class="text-4xl ${currentWeather.color}">
-                ${currentWeather.icon}
-              </div>
-            </div>
-          </div>
-
-          <!-- Humedad -->
-          <div
-            class="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500"
-          >
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-gray-500 text-sm font-medium">Humedad</p>
-                <p class="text-3xl font-bold text-gray-800">
-                  ${weather.current.humidity}%
-                </p>
-                <p class="text-gray-400 text-sm">
-                  ${currentWeather.description}
-                </p>
-              </div>
-              <div class="text-4xl text-green-500">💧</div>
-            </div>
-          </div>
-
-          <!-- Viento -->
-          <div
-            class="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500"
-          >
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-gray-500 text-sm font-medium">Viento</p>
-                <p class="text-3xl font-bold text-gray-800">
-                  ${weather.current.windSpeed} km/h
-                </p>
-                <p class="text-gray-400 text-sm">Velocidad del viento</p>
-              </div>
-              <div class="text-4xl text-purple-500">💨</div>
-            </div>
-          </div>
-
-          <!-- Precipitación -->
-          <div
-            class="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-500"
-          >
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-gray-500 text-sm font-medium">Precipitación</p>
-                <p class="text-3xl font-bold text-gray-800">
-                  ${weather.current.precipitation} mm
-                </p>
-                <p class="text-gray-400 text-sm">Actual</p>
-              </div>
-              <div class="text-4xl text-orange-500">🌧️</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Pronóstico 5 días -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h3 class="text-xl font-bold text-gray-800 mb-4">
-            Pronóstico 5 días
-          </h3>
-          <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            ${weather.daily.map((day) => {
-              const dayWeather = this.getWeatherInfo(day.weatherCode);
-              return html`
-                <div
-                  class="text-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <p class="text-sm font-medium text-gray-600 mb-2">
-                    ${day.date}
+        <!-- Current Weather -->
+        <div>
+          <h3 class="text-xl font-bold text-gray-800 mb-4">Current Weather</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- Temperatura principal -->
+            <div
+              class="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-gray-500 text-sm font-medium">Temperatura</p>
+                  <p class="text-3xl font-bold text-gray-800">
+                    ${weather.current.temperature}°C
                   </p>
-                  <div class="text-3xl mb-2 ${dayWeather.color}">
-                    ${dayWeather.icon}
-                  </div>
-                  <div class="space-y-1">
-                    <p class="text-lg font-bold text-gray-800">
-                      ${day.tempMax}°
-                    </p>
-                    <p class="text-sm text-gray-500">${day.tempMin}°</p>
-                    ${day.precipitation > 0
-                      ? html`<p class="text-xs text-blue-600">
-                          ${day.precipitation}mm
-                        </p>`
-                      : ""}
-                  </div>
-                </div>
-              `;
-            })}
-          </div>
-        </div>
-
-        <!-- Pronóstico horario (primeras 12 horas) -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h3 class="text-xl font-bold text-gray-800 mb-4">
-            Próximas 12 horas
-          </h3>
-          <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            ${weather.hourly.next24h.slice(0, 12).map((hour) => {
-              const hourWeather = this.getWeatherInfo(hour.weatherCode);
-              return html`
-                <div class="text-center p-3 border border-gray-200 rounded-lg">
-                  <p class="text-xs text-gray-500 mb-1">${hour.time}</p>
-                  <div class="text-2xl mb-1 ${hourWeather.color}">
-                    ${hourWeather.icon}
-                  </div>
-                  <p class="text-sm font-bold text-gray-800">
-                    ${hour.temperature}°
+                  <p class="text-gray-400 text-sm">
+                    Sensación: ${weather.current.apparentTemperature}°C
                   </p>
-                  ${hour.precipitation > 0
-                    ? html`<p class="text-xs text-blue-600">
-                        ${hour.precipitation}%
-                      </p>`
-                    : ""}
                 </div>
-              `;
-            })}
+                <div class="text-4xl ${currentWeather.color}">
+                  ${currentWeather.icon}
+                </div>
+              </div>
+            </div>
+
+            <!-- Humedad -->
+            <div
+              class="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-gray-500 text-sm font-medium">Humedad</p>
+                  <p class="text-3xl font-bold text-gray-800">
+                    ${weather.current.humidity}%
+                  </p>
+                  <p class="text-gray-400 text-sm">
+                    ${currentWeather.description}
+                  </p>
+                </div>
+                <div class="text-4xl text-green-500">💧</div>
+              </div>
+            </div>
+
+            <!-- Viento -->
+            <div
+              class="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-gray-500 text-sm font-medium">Viento</p>
+                  <p class="text-3xl font-bold text-gray-800">
+                    ${weather.current.windSpeed} km/h
+                  </p>
+                  <p class="text-gray-400 text-sm">Velocidad del viento</p>
+                </div>
+                <div class="text-4xl text-purple-500">💨</div>
+              </div>
+            </div>
+
+            <!-- Precipitación -->
+            <div
+              class="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-500"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-gray-500 text-sm font-medium">Precipitación</p>
+                  <p class="text-3xl font-bold text-gray-800">
+                    ${weather.current.precipitation} mm
+                  </p>
+                  <p class="text-gray-400 text-sm">Actual</p>
+                </div>
+                <div class="text-4xl text-orange-500">🌧️</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
