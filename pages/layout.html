@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+
+<head>
+  <meta charset="UTF-8">
+  <title>{{metadata.title}}</title>
+  <meta name="description" content="{{metadata.description}}">
+  <link rel="stylesheet" href="/public/styles.css">
+  <script type="module" src="/public/app/index.js"></script>
+</head>
+
+<body class="h-full flex flex-col bg-gray-50">
+  <header class="bg-white shadow-lg border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center py-6">
+        <h1 class="text-3xl font-bold text-gray-900 hover:text-blue-600 transition-colors duration-200">
+          <a href="/"
+            class="text-3xl font-bold text-gray-900 hover:text-blue-600 transition-colors duration-200 no-underline">
+            Vanilla JS
+          </a>
+        </h1>
+
+        <nav class="hidden md:block">
+          <ul class="flex space-x-8">
+            <li>
+              <a class="navLink text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200 border-b-2 border-transparent hover:border-blue-600 pb-1"
+                href="/">
+                Home SSR
+              </a>
+            </li>
+            <li>
+              <a class="navLink text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200 border-b-2 border-transparent hover:border-blue-600 pb-1"
+                href="/meteo-csr">
+                Meteo CSR
+              </a>
+            </li>
+            <li>
+              <a class="navLink text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200 border-b-2 border-transparent hover:border-blue-600 pb-1"
+                href="/meteo-ssr">
+                Meteo SSR
+              </a>
+            </li>
+            <li>
+              <a class="navLink text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200 border-b-2 border-transparent hover:border-blue-600 pb-1"
+                href="/private">
+                Private
+              </a>
+            </li>
+          </ul>
+        </nav>
+
+        <button
+          class="md:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+
+      <nav class="md:hidden pb-4">
+        <ul class="space-y-2">
+          <li>
+            <a class="navLink block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-md font-medium transition-colors duration-200"
+              href="/">
+              Home SSR
+            </a>
+          </li>
+          <li>
+            <a class="navLink block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-md font-medium transition-colors duration-200"
+              href="/meteo-csr">
+              Meteo CSR
+            </a>
+          </li>
+          <li>
+            <a class="navLink block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-md font-medium transition-colors duration-200"
+              href="/meteo-ssr">
+              Meteo SSR
+            </a>
+          </li>
+          <li>
+            <a class="navLink block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-md font-medium transition-colors duration-200"
+              href="/private">
+              Private
+            </a>
+          </li>
+          <li>
+            <a class="navLink block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-md font-medium transition-colors duration-200"
+              href="/404-page-not-found">
+              404 Page
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 min-h-[60vh]">
+      {{children}}
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-900 text-white mt-auto">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="flex flex-col md:flex-row justify-between items-center">
+        <div class="mb-4 md:mb-0">
+          <p class="text-gray-300 text-sm">
+            © 2025 Vanilla JS. Made with ❤️ and no frameworks.
+          </p>
+        </div>
+        <div class="flex space-x-6">
+          <a href="#" class="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+            GitHub
+          </a>
+          <a href="#" class="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+            Docs
+          </a>
+          <a href="#" class="text-gray-300 hover:text-white transition-colors duration-200 text-sm">
+            Contact
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+</body>
+
+</html>

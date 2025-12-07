@@ -1,0 +1,133 @@
+<template>
+  <section class="max-w-6xl mx-auto p-6 space-y-8">
+    <!-- Header del Clima -->
+    <div class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl font-bold mb-2">🌤️ Weather in {{location.city}}</h1>
+          <p class="text-blue-100">Real-time data from Open-Meteo</p>
+        </div>
+        <div class="text-right">
+          <div class="text-4xl font-bold">{{current.temperature}}°C</div>
+          <div class="text-blue-200">Feels like: {{current.apparentTemperature}}°C</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Clima Actual -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-gray-600 text-sm font-medium">Temperatura</p>
+            <p class="text-2xl font-bold text-gray-800">{{current.temperature}}°C</p>
+          </div>
+          <div class="text-3xl">🌡️</div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-gray-600 text-sm font-medium">Humedad</p>
+            <p class="text-2xl font-bold text-gray-800">{{current.humidity}}%</p>
+          </div>
+          <div class="text-3xl">💧</div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-yellow-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-gray-600 text-sm font-medium">Viento</p>
+            <p class="text-2xl font-bold text-gray-800">{{current.windSpeed}} km/h</p>
+          </div>
+          <div class="text-3xl">💨</div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-gray-600 text-sm font-medium">Precipitación</p>
+            <p class="text-2xl font-bold text-gray-800">{{current.precipitation}} mm</p>
+          </div>
+          <div class="text-3xl">🌧️</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pronóstico de 7 días -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+        📅 7-Day Forecast
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+        {{#each daily}}
+        <div class="bg-gray-50 rounded-lg p-4 text-center hover:bg-gray-100 transition-colors">
+          <div class="text-sm text-gray-600 mb-2">{{formatDate date}}</div>
+          <div class="text-2xl mb-2">{{getWeatherIcon weatherCode}}</div>
+          <div class="space-y-1">
+            <div class="text-lg font-semibold text-gray-800">{{tempMax}}°</div>
+            <div class="text-sm text-gray-500">{{tempMin}}°</div>
+          </div>
+          <div class="text-xs text-blue-600 mt-2">{{precipitation}} mm</div>
+        </div>
+        {{/each}}
+      </div>
+    </div>
+
+    <!-- Pronóstico Horario -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+        ⏰ Next 24 Hours
+      </h2>
+      <div class="overflow-x-auto">
+        <div class="flex space-x-4 pb-4" style="min-width: max-content;">
+          {{#each hourly.times}}
+          <div class="bg-gray-50 rounded-lg p-3 text-center min-w-[80px] hover:bg-gray-100 transition-colors">
+            <div class="text-xs text-gray-600 mb-1">{{formatHour this}}</div>
+            <div class="text-lg mb-1">{{getWeatherIcon (lookup ../hourly.weatherCodes @index)}}</div>
+            <div class="text-sm font-semibold text-gray-800">{{lookup ../hourly.temperatures @index}}°</div>
+            <div class="text-xs text-blue-600">{{lookup ../hourly.precipitation @index}}%</div>
+          </div>
+          {{/each}}
+        </div>
+      </div>
+    </div>
+
+    <!-- Información adicional -->
+    <div class="bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg p-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <h3 class="text-lg font-semibold text-gray-800 mb-3">📍 Location</h3>
+          <div class="space-y-2 text-sm text-gray-600">
+            <p><span class="font-medium">City:</span> {{location.city}}</p>
+            <p><span class="font-medium">Coordinates:</span> {{location.latitude}}, {{location.longitude}}</p>
+            <p><span class="font-medium">Timezone:</span> {{location.timezone}}</p>
+          </div>
+        </div>
+        <div>
+          <h3 class="text-lg font-semibold text-gray-800 mb-3">ℹ️ Information</h3>
+          <div class="space-y-2 text-sm text-gray-600">
+            <p><span class="font-medium">Source:</span> Open-Meteo API</p>
+            <p><span class="font-medium">Update:</span> Real time</p>
+            <p><span class="font-medium">Precision:</span> Official weather data</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {{#if error}}
+    <div class="bg-red-50 border border-red-200 rounded-lg p-6">
+      <div class="flex items-center">
+        <div class="text-red-500 text-xl mr-3">⚠️</div>
+        <div>
+          <h3 class="text-red-800 font-semibold">Error loading weather data</h3>
+          <p class="text-red-600 text-sm mt-1">{{message}}</p>
+        </div>
+      </div>
+    </div>
+    {{/if}}
+  </section>
+</template>
