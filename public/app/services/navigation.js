@@ -1,4 +1,4 @@
-import { MeteoPage } from "../../components/MeteoPage.js";
+import { MeteoPage } from "../../components/meteo-page.js";
 
 // Notes: In future, we can add this routes automatically when we build the project, getting the info from pages directory
 export const routes = [

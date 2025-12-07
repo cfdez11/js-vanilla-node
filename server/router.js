@@ -53,16 +53,16 @@ const sendResponse = (res, statusCode, html) => {
 /**
  * Extracts server script, client script from HTML page
  * @param {string} pageContent
- * @returns {{
- *  getData: Promise | null,
+ * @returns {Promise<{
+ *  getData: Function | null,
  *  metadata: {
  *  title?: string,
  *  description?: string,
  * },
  *  clientCode: string
- * }}
+ * }>}
  */
-function extractPageScripts(pageContent) {
+async function extractPageScripts(pageContent) {
   // Extract server-side script
   const serverMatch = pageContent.match(/<script server>([\s\S]*?)<\/script>/);
   // Extract client-side script:
@@ -74,9 +74,10 @@ function extractPageScripts(pageContent) {
 
   if (serverMatch) {
     try {
-      // Remove import statements (they can't run in new Function)
+      // Remove import/export statements (they can't run in new Function)
       const cleanedScript = serverMatch[1]
         .replace(/import\s+.*?;?\n?/g, "")
+        .replace(/export\s+/g, "")
         .trim();
 
       const moduleCode = `
@@ -86,9 +87,12 @@ function extractPageScripts(pageContent) {
           metadata: typeof metadata !== 'undefined' ? metadata : {} 
         };
       `;
-      const result = new Function(moduleCode)();
-      getData = result.getData;
-      metadata = result.metadata;
+      const AsyncFunction = Object.getPrototypeOf(
+        async function () {}
+      ).constructor;
+      const result = new AsyncFunction(moduleCode)();
+      getData = (await result).getData;
+      metadata = (await result).metadata;
     } catch (error) {
       console.warn(`Error evaluating server script: ${error.message}`);
     }
@@ -114,8 +118,9 @@ function extractPageScripts(pageContent) {
 async function loadPageTemplate(pageName, additionalData = null) {
   try {
     const templateContent = await fs.readFile(getPagePath(pageName), "utf-8");
-    const { getData, metadata, clientCode } =
-      extractPageScripts(templateContent);
+    const { getData, metadata, clientCode } = await extractPageScripts(
+      templateContent
+    );
     const data = (await getData?.(additionalData)) ?? {};
     return { data, metadata, clientCode };
   } catch (error) {

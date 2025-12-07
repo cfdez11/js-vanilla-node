@@ -1,5 +1,5 @@
 import { reactive, effect } from "../app/services/reactive.js";
-import { Component } from "../app/services/Component.js";
+import { Component } from "../app/services/component.js";
 import { html } from "../app/services/html.js";
 import { defineComponent } from "../app/services/decorators.js";
 

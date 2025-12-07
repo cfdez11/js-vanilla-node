@@ -26,6 +26,9 @@
   <suspense fallback="<s-user-card-skeleton></s-user-card-skeleton>">
     <s-user-card-delayed userId="{{userId}}"></s-user-card-delayed>
   </suspense>
+  <suspense fallback="<s-user-card-skeleton></s-user-card-skeleton>">
+    <s-user-card-delayed-2 userId="{{userId}}"></s-user-card-delayed-2>
+  </suspense>
 
   <p>Client-rendered interactive content:</p>
   <c-counter start="5"></c-counter>

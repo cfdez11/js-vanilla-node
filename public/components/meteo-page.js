@@ -1,7 +1,7 @@
-import { Component } from "../app/services/Component.js";
+import { Component } from "../app/services/component.js";
 import { defineComponent } from "../app/services/decorators.js";
 import { html } from "../app/services/html.js";
-import "../components/Weather.js";
+import "./Weather.js";
 
 export class MeteoPage extends Component {
   render() {

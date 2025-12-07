@@ -1,4 +1,4 @@
-class AnimatedLoading extends HTMLElement {
+class Skeleton extends HTMLElement {
   constructor() {
     super();
   }
@@ -19,4 +19,4 @@ class AnimatedLoading extends HTMLElement {
   }
 }
 
-customElements.define("skeleton", AnimatedLoading);
+customElements.define("skeleton", Skeleton);
