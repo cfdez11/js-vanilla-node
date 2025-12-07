@@ -1,5 +1,5 @@
 import path from "path";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import { renderTemplate } from "./utils/template.js";
 import {
   extractSuspenseBoundaries,
@@ -62,10 +62,8 @@ const sendResponse = (res, statusCode, html) => {
  *  clientCode: string
  * }>}
  */
-async function extractPageScripts(pageContent) {
-  // Extract server-side script
+async function extractPageScripts(pageContent, pagePath) {
   const serverMatch = pageContent.match(/<script server>([\s\S]*?)<\/script>/);
-  // Extract client-side script:
   const clientMatch = pageContent.match(/<script client>([\s\S]*?)<\/script>/);
 
   let getData = null;
@@ -74,25 +72,47 @@ async function extractPageScripts(pageContent) {
 
   if (serverMatch) {
     try {
-      // Remove import/export statements (they can't run in new Function)
-      const cleanedScript = serverMatch[1]
-        .replace(/import\s+.*?;?\n?/g, "")
+      // find all imports used in the server script
+      const imports = {};
+      const scriptContent = serverMatch[1];
+      const importRegex = /import\s+\{([^}]*)\}\s+from\s+['"]([^'"]*)['"]/g;
+      let match;
+
+      while ((match = importRegex.exec(scriptContent)) !== null) {
+        const importedNames = match[1].split(",").map((s) => s.trim());
+        const modulePath = match[2];
+
+        const resolvedPath = path.resolve(path.dirname(pagePath), modulePath);
+        const fileUrl = pathToFileURL(resolvedPath).href;
+        const module = await import(fileUrl);
+
+        for (const name of importedNames) {
+          imports[name] = module[name];
+        }
+      }
+
+      const cleanedScript = scriptContent
+        .replace(/import\s+\{[^}]*\}\s+from\s+['"][^'"]*['"];?\n?/g, "")
+        .replace(/import\s+\*\s+as\s+\w+\s+from\s+['"][^'"]*['"];?\n?/g, "")
+        .replace(/import\s+\w+\s+from\s+['"][^'"]*['"];?\n?/g, "")
         .replace(/export\s+/g, "")
         .trim();
 
-      const moduleCode = `
-        ${cleanedScript}
-        return { 
-          getData: typeof getData !== 'undefined' ? getData : null, 
-          metadata: typeof metadata !== 'undefined' ? metadata : {} 
-        };
-      `;
+      // Get a constructor to create async functions
       const AsyncFunction = Object.getPrototypeOf(
         async function () {}
       ).constructor;
-      const result = new AsyncFunction(moduleCode)();
-      getData = (await result).getData;
-      metadata = (await result).metadata;
+      const fn = new AsyncFunction(
+        ...Object.keys(imports),
+        `
+        ${cleanedScript}
+        return { getData, metadata: metadata || {} };
+      `
+      );
+
+      const result = await fn(...Object.values(imports));
+      getData = result.getData;
+      metadata = result.metadata;
     } catch (error) {
       console.warn(`Error evaluating server script: ${error.message}`);
     }
@@ -101,7 +121,6 @@ async function extractPageScripts(pageContent) {
   return { getData, metadata, clientCode };
 }
 
-/** Loads page and extracts data, metadata and client code */
 /**
  * Loads page and extracts data, metadata and client code
  * @param {string} pageName
@@ -117,9 +136,11 @@ async function extractPageScripts(pageContent) {
  */
 async function loadPageTemplate(pageName, additionalData = null) {
   try {
-    const templateContent = await fs.readFile(getPagePath(pageName), "utf-8");
+    const pagePath = getPagePath(pageName);
+    const templateContent = await fs.readFile(pagePath, "utf-8");
     const { getData, metadata, clientCode } = await extractPageScripts(
-      templateContent
+      templateContent,
+      pagePath
     );
     const data = (await getData?.(additionalData)) ?? {};
     return { data, metadata, clientCode };

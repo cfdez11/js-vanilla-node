@@ -2,8 +2,7 @@
   import { delay } from "../../server/utils/delay.js";
 
   async function getData () {
-    // Simulate API delay (2 seconds)
-    await delay(2000);
+    await delay(1000);
 
     // Mock weather data
     return {
@@ -114,11 +113,11 @@
       <h1 class="text-4xl font-bold mb-4">Weather Dashboard</h1>
       <p class="text-lg text-gray-600 max-w-2xl mx-auto">
         All weather data is fetched on the server
-        (with a simulated 2-second delay) before the page is sent to your browser.
+        (with a simulated 1-second delay) before the page is sent to your browser.
       </p>
       <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg inline-block">
         <p class="text-sm text-yellow-800">
-          ⏱️ <strong>Note:</strong> This page took ~2 seconds to load because the server waited for all data before
+          ⏱️ <strong>Note:</strong> This page took ~1 second to load because the server waited for all data before
           sending the HTML.
         </p>
       </div>
