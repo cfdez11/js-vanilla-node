@@ -55,93 +55,92 @@ export const routes = [
   // },
 ];
 
-export const Router = {
-  currentRoute: null,
+function findRoute(path) {
+  return routes.find((r) => {
+    if (typeof r.path === "string") return r.path === path;
+    if (r.path instanceof RegExp) return path.match(r.path);
+    return false;
+  });
+}
 
-  init() {
-    window.addEventListener("popstate", () => {
-      this.go(location.pathname, false);
-    });
+function handleClickLink(event, link) {
+  const href = link.getAttribute("href");
+  const routePath = href.split("?")[0];
+  const route = findRoute(routePath);
 
-    document.addEventListener("click", (event) => {
-      const link = event.target.closest("a");
-      if (link) {
-        this.handleClickLink(event, link);
-      }
-    });
+  if (window.location.pathname === routePath) {
+    event.preventDefault();
+    return;
+  }
 
-    this.go(location.pathname, false);
-  },
+  // Client side navigation - SPA
+  if (route && !route.meta?.ssr) {
+    event.preventDefault();
+    navigate(href);
+  }
+}
 
-  findRoute(path) {
-    return routes.find((r) => {
-      if (typeof r.path === "string") return r.path === path;
-      if (r.path instanceof RegExp) return path.match(r.path);
-      return false;
-    });
-  },
+/**
+ * Must be initialized inside a DOMContentLoaded event listener
+ */
+function initializeRouter() {
+  window.addEventListener("popstate", () => {
+    navigate(location.pathname, false);
+  });
 
-  handleClickLink(event, link) {
-    const href = link.getAttribute("href");
-    const routePath = href.split("?")[0];
-    const route = this.findRoute(routePath);
-
-    if (window.location.pathname === routePath) {
-      event.preventDefault();
-      return;
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest("a");
+    if (link) {
+      handleClickLink(event, link);
     }
+  });
 
-    // Client side navigation - SPA
-    if (route && !route.meta?.ssr) {
-      event.preventDefault();
-      this.go(href);
-    }
-  },
+  navigate(location.pathname, false);
+}
 
-  go(path, addToHistory = true) {
-    const routePath = path.split("?")[0];
-    const route = this.findRoute(routePath);
+function renderPage(route, path) {
+  const main = document.querySelector("main");
 
-    // Skip SSR routes
-    if (route?.meta?.ssr) return;
+  if (!route || !route.component) {
+    return;
+  }
 
-    if (addToHistory) {
-      history.pushState({}, "", path);
-    }
+  // Get regex matches for dynamic routes
+  let params = [];
+  if (route.path instanceof RegExp) {
+    const match = path.match(route.path);
+    params = match ? match.slice(1) : [];
+  }
 
-    // Auth checks
-    if (route?.meta?.requiresAuth && !app.Store?.loggedIn) {
-      this.go("/account/login");
-      return;
-    }
+  const pageElement = new route.component(...params);
 
-    if (route?.meta?.accessOnly && app.Store?.loggedIn) {
-      this.go("/account");
-      return;
-    }
+  main.innerHTML = "";
+  main.appendChild(pageElement);
+}
 
-    this.render(route, routePath);
-  },
+function navigate(path, addToHistory = true) {
+  const routePath = path.split("?")[0];
+  const route = findRoute(routePath);
 
-  render(route, path) {
-    const main = document.querySelector("main");
+  // Skip SSR routes
+  if (route?.meta?.ssr) return;
 
-    if (!route || !route.component) {
-      return;
-    }
+  if (addToHistory) {
+    history.pushState({}, "", path);
+  }
 
-    // Get regex matches for dynamic routes
-    let params = [];
-    if (route.path instanceof RegExp) {
-      const match = path.match(route.path);
-      params = match ? match.slice(1) : [];
-    }
+  // Auth checks
+  if (route?.meta?.requiresAuth && !app.Store?.loggedIn) {
+    navigate("/account/login");
+    return;
+  }
 
-    const pageElement = new route.component(...params);
+  if (route?.meta?.accessOnly && app.Store?.loggedIn) {
+    navigate("/account");
+    return;
+  }
 
-    main.innerHTML = "";
-    main.appendChild(pageElement);
+  renderPage(route, routePath);
+}
 
-    this.currentRoute = route;
-  },
-};
+export { initializeRouter, renderPage, navigate };

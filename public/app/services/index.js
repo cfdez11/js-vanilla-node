@@ -1,9 +1,9 @@
-import { Router } from "./navigation.js";
+import { initializeRouter } from "./navigation.js";
 
 window.app = {
-  Router,
+  navigate,
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-  app.Router.init();
+  initializeRouter();
 });
