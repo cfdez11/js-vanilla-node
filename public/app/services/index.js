@@ -1,4 +1,4 @@
-import { initializeRouter } from "./navigation.js";
+import { initializeRouter, navigate } from "./navigation.js";
 
 window.app = {
   navigate,

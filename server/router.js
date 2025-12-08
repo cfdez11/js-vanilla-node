@@ -1,6 +1,7 @@
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
-import { renderTemplate } from "./utils/template.js";
+// import { renderTemplate } from "./utils/template.old.js";
+import { compileTemplateToHTML } from "./utils/template.js";
 import {
   extractSuspenseBoundaries,
   renderNonSuspendedComponents,
@@ -31,13 +32,38 @@ const FALLBACK_ERROR_HTML = `
 `;
 
 /**
- * Builds the path to a page file
- * @param {string} pageName
+ * Builds the path to a component file
+ * @param {string} componentName
  * @param {string} file
  * @returns {string}
  */
-const getPagePath = (pageName, file = "page.html") =>
-  path.resolve(PAGES_DIR, pageName, file);
+const getComponentPath = (componentName, file = "page.html") =>
+  path.resolve(PAGES_DIR, componentName, file);
+
+/**
+ * Retrieves the template string for a given page
+ * @param {string} pageName
+ * @returns {Promise<string>}
+ */
+const getTemplatePageString = async (pageName) => {
+  const pagePath = getComponentPath(pageName);
+  const page = await fs.readFile(pagePath, "utf-8");
+
+  const templateMatch = page.match(/<template>([\s\S]*?)<\/template>/);
+  const templatePage = templateMatch ? templateMatch[1].trim() : "";
+
+  return templatePage;
+};
+
+/**
+ * Retrieves the layout html string
+ * @returns {Promise<string>}
+ */
+const getTemplateLayoutString = async () => {
+  const layoutPath = getComponentPath("", "layout.html");
+  const layoutHtml = await fs.readFile(layoutPath, "utf-8");
+  return layoutHtml;
+};
 
 /**
  * Sends HTML response to client and close request
@@ -136,7 +162,7 @@ async function extractPageScripts(pageContent, pagePath) {
  */
 async function loadPageTemplate(pageName, additionalData = null) {
   try {
-    const pagePath = getPagePath(pageName);
+    const pagePath = getComponentPath(pageName);
     const templateContent = await fs.readFile(pagePath, "utf-8");
     const { getData, metadata, clientCode } = await extractPageScripts(
       templateContent,
@@ -170,7 +196,8 @@ function generateClientScriptTag(clientCode) {
  * @returns {Promise<{fullHtml: string, suspenseComponents: any[]}>}
  */
 async function renderPage(pageName, data, metadata = {}, clientCode = "") {
-  let pageHtml = renderTemplate(getPagePath(pageName), data);
+  const pageTemplate = await getTemplatePageString(pageName);
+  let pageHtml = compileTemplateToHTML(pageTemplate, data);
 
   // First render non-suspended server components
   pageHtml = await renderNonSuspendedComponents(pageHtml);
@@ -182,7 +209,8 @@ async function renderPage(pageName, data, metadata = {}, clientCode = "") {
 
   const clientScripts = generateClientScriptTag(clientCode);
 
-  const fullHtml = renderTemplate(path.resolve(PAGES_DIR, "layout.html"), {
+  const layoutTemplate = await getTemplateLayoutString();
+  const fullHtml = compileTemplateToHTML(layoutTemplate, {
     children: initialHtml,
     clientScripts,
     metadata: { ...DEFAULT_METADATA, ...metadata },
