@@ -1,20 +1,16 @@
-import path from "path";
-import { fileURLToPath, pathToFileURL } from "url";
+import { renderHtmlFile } from "./component-processor.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const suspenseRegex = /<suspense\s+fallback="([^"]*)">([\s\S]*?)<\/suspense>/g;
-const serverElementRegex = /<(s-[a-z0-9-]+)\s*([^>]*)><\/\1>/g;
+// processNode of compileTemplateToHTML remove binding characters (:)
+const suspenseRegex = /<Suspense\s+fallback="([^"]*)">([\s\S]*?)<\/Suspense>/g;
 
 /**
  * Parses raw attribute string into an object
  * @param {string} raw
- * @returns {Object<string, string>} Parsed attributes
+ * @returns {Object<string, string>}
  */
 function parseAttributes(raw) {
   const attrs = {};
-  const regex = /([a-zA-Z0-9_-]+)="([^"]*)"/g;
+  const regex = /([a-zA-Z0-9_:-]+)="([^"]*)"/g;
   let match;
   while ((match = regex.exec(raw))) {
     attrs[match[1]] = match[2];
@@ -23,167 +19,136 @@ function parseAttributes(raw) {
 }
 
 /**
- * Renders a single server component
- * @param {string} tag
- * @param {Object<string, string>} attrs
- * @returns {Promise<string>} Rendered HTML
- */
-async function renderServerComponent(tag, attrs) {
-  const componentName = tag.substring(2); // remove 's-' prefix
-  const modulePath = path.resolve(
-    __dirname,
-    "../components",
-    `${componentName}.js`
-  );
-  const componentModule = await import(pathToFileURL(modulePath).href);
-  return await componentModule.default(attrs);
-}
-
-/**
- * Renders server components that are NOT inside suspense boundaries
+ * Renders components in HTML
  * @param {string} html
- * @returns {Promise<string>} HTML with non-suspended server components rendered
+ * @param {Map} componentRegistry
+ * @returns {Promise<string>}
  */
-export async function renderNonSuspendedComponents(html) {
-  // First, temporarily replace suspense blocks (including the component) with placeholders to avoid loading them
-  const suspenseBlocks = [];
-  let tempHtml = html.replace(suspenseRegex, (match) => {
-    const index = suspenseBlocks.length;
-    suspenseBlocks.push(match);
-    return `<!--SUSPENSE_PLACEHOLDER_${index}-->`;
-  });
+async function processComponents(html, componentRegistry) {
+  let processedHtml = html;
+  const allMatches = [];
 
-  // Now render server components outside suspense
-  let serverMatch;
-  serverElementRegex.lastIndex = 0;
-  while ((serverMatch = serverElementRegex.exec(tempHtml)) !== null) {
-    const tag = serverMatch[1];
-    const rawAttrs = serverMatch[2];
-    const attrs = parseAttributes(rawAttrs);
-    const rendered = await renderServerComponent(tag, attrs);
-    tempHtml = tempHtml.replace(serverMatch[0], rendered);
-    serverElementRegex.lastIndex = 0; // Reset regex after replacement
+  for (const [componentName, componentData] of componentRegistry.entries()) {
+    const escapedName = componentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const componentRegex = new RegExp(
+      `<${escapedName}(?![a-zA-Z0-9_-])\\s*([^>]*?)\\s*(?:\\/>|>\\s*<\\/${escapedName}(?![a-zA-Z0-9_-])>)`,
+      "gi"
+    );
+
+    const replacements = [];
+    let match;
+
+    while ((match = componentRegex.exec(html)) !== null) {
+      const matchData = {
+        name: componentName,
+        attrs: parseAttributes(match[1]),
+        fullMatch: match[0],
+        start: match.index,
+        end: match.index + match[0].length,
+      };
+
+      replacements.push(matchData);
+      allMatches.push(matchData);
+    }
+
+    // Render in reverse order to maintain indices
+    for (let i = replacements.length - 1; i >= 0; i--) {
+      const { start, end, attrs } = replacements[i];
+      const { html: htmlComponent } = await renderHtmlFile(
+        componentData.path,
+        attrs
+      );
+      processedHtml =
+        processedHtml.slice(0, start) +
+        htmlComponent +
+        processedHtml.slice(end);
+    }
   }
 
-  // Restore suspense blocks
-  suspenseBlocks.forEach((block, index) => {
-    tempHtml = tempHtml.replace(`<!--SUSPENSE_PLACEHOLDER_${index}-->`, block);
-  });
-
-  return tempHtml;
+  return processedHtml;
 }
 
 /**
- * Extracts suspense boundaries and returns initial HTML with fallbacks
- * @param {string} html
+ * Renders server components, handling both regular and suspense boundaries
+ * Server components without suspense are rendered immediately.
+ * Server components inside <Suspense> boundaries are saved in suspenseComponents.
+ * @param {string} pageHtml
+ * @param {Map<string, {getData: Function, template: string}>} componentRegistry
  * @returns {Promise<{
- *  initialHtml: string,
- *  suspenseComponents: Array<{
- *    id: string,
- *    content: string,
- *    serverComponents: Array<{
- *      tag: string,
- *      attrs: Object<string, string>,
- *      fullMatch: string
- *    }>
- *  }>
- * }>} Extracted suspense components and initial HTML
+ *   html: string,
+ *   suspenseComponents: Array<{
+ *     id: string,
+ *     content: string,
+ *   }>
+ * }>}
  */
-export async function extractSuspenseBoundaries(html) {
+export async function renderServerComponents(
+  pageHtml,
+  componentRegistry = new Map()
+) {
   const suspenseComponents = [];
   let suspenseId = 0;
-  const replacements = [];
+  let html = pageHtml;
 
-  // First pass: collect all suspense matches
+  // Process suspense boundaries one by one (not in reverse)
   let match;
+  suspenseRegex.lastIndex = 0;
+
   while ((match = suspenseRegex.exec(html)) !== null) {
-    replacements.push({
-      fullMatch: match[0],
-      fallback: match[1],
-      content: match[2],
-    });
-  }
+    const id = `suspense-${suspenseId++}`;
+    const [fullMatch, fallback, content] = match;
 
-  // Process each suspense
-  let initialHtml = html;
-  for (const replacement of replacements) {
-    const id = `suspense-${suspenseId++}`; // todo: use id generator or hash
-    let fallbackHtml = replacement.fallback;
-
-    // Render server components in fallback
-    let componentMatch;
-    serverElementRegex.lastIndex = 0;
-    while ((componentMatch = serverElementRegex.exec(fallbackHtml)) !== null) {
-      const tag = componentMatch[1];
-      const attrs = parseAttributes(componentMatch[2]);
-      const rendered = await renderServerComponent(tag, attrs);
-      fallbackHtml = fallbackHtml.replace(componentMatch[0], rendered);
-      serverElementRegex.lastIndex = 0;
-    }
-
-    // Find server components inside this suspense content
-    const serverComponents = [];
-    serverElementRegex.lastIndex = 0;
-    while (
-      (componentMatch = serverElementRegex.exec(replacement.content)) !== null
-    ) {
-      serverComponents.push({
-        tag: componentMatch[1],
-        attrs: parseAttributes(componentMatch[2]),
-        fullMatch: componentMatch[0],
-      });
-    }
+    // Render components in fallback
+    const fallbackHtml = await processComponents(fallback, componentRegistry);
 
     suspenseComponents.push({
       id,
-      content: replacement.content,
-      serverComponents,
+      content: content,
     });
 
-    // Replace suspense with container having the rendered fallback
-    initialHtml = initialHtml.replace(
-      replacement.fullMatch,
-      `<div id="${id}">${fallbackHtml}</div>`
-    );
+    // Replace suspense block with container
+    const replacement = `<div id="${id}">${fallbackHtml}</div>`;
+    html = html.replace(fullMatch, replacement);
+    // Reset regex to search from the beginning since we modified the string
+    suspenseRegex.lastIndex = 0;
   }
 
-  return { initialHtml, suspenseComponents };
+  // Render all non-suspended components
+  html = await processComponents(html, componentRegistry);
+
+  return { html, suspenseComponents };
 }
 
 /**
- * Generates the streaming replacement using template + external script
- * @param {string} suspenseId ID of the suspense boundary
- * @param {string} renderedContent Rendered HTML content to replace fallback
+ * Generates streaming replacement content for a suspense component
+ * Note: needs script to hydrate the content on the client side
+ * @param {string} suspenseId
+ * @param {string} renderedContent
+ * @returns {string}
  */
 export function generateReplacementContent(suspenseId, renderedContent) {
   const contentId = `${suspenseId}-content`;
-
   return `<template id="${contentId}">${renderedContent}</template><script src="/public/app/services/hydrate.js" data-target="${suspenseId}" data-source="${contentId}" async></script>`;
 }
 
 /**
- * Renders all server components inside a suspense boundary
+ * Renders all components inside a suspense boundary
  * @param {{
- *  id: string,
- *  content: string,
- *  serverComponents: Array<{
- *    tag: string,
- *    attrs: Object<string, string>,
- *    fullMatch: string
- *  }>
- * }} suspenseComponent Suspense component data
- * @returns {Promise<string>} Rendered HTML content
+ *   id: string,
+ *   content: string,
+ *   components: Array<{name: string, attrs: object, fullMatch: string}>
+ * }} suspenseComponent
+ * @param {Map} componentRegistry
+ * @returns {Promise<string>}
  */
-export async function renderSuspenseContent(suspenseComponent) {
-  let content = suspenseComponent.content;
+export async function renderSuspenseComponent(
+  suspenseComponent,
+  componentRegistry
+) {
+  const html = await processComponents(
+    suspenseComponent.content,
+    componentRegistry
+  );
 
-  for (const component of suspenseComponent.serverComponents) {
-    const rendered = await renderServerComponent(
-      component.tag,
-      component.attrs
-    );
-    content = content.replace(component.fullMatch, rendered);
-  }
-
-  return content.trim();
+  return html;
 }

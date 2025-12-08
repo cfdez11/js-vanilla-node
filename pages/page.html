@@ -1,4 +1,8 @@
 <script server>
+  import UserCard from "server/components/user-card.html";
+  import UserCardDelayed from "server/components/user-card-delayed.html";
+  import UserCardSkeleton from "server/components/user-card-skeleton.html";
+
   async function getData () {
     return { userId: 123, name: "Alice", attributes: ["admin", "editor"] };
   }
@@ -32,7 +36,7 @@
           {{attribute}}
         </div>
         <div class="bg-blue-50 p-4 rounded">
-          <s-user-card userId="{{userId}}"></s-user-card>
+          <UserCard :userId="userId" />
         </div>
       </section>
 
@@ -43,14 +47,14 @@
           content streams in. The rest of the page loads without waiting:</p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="bg-purple-50 p-4 rounded">
-            <suspense fallback="<s-user-card-skeleton></s-user-card-skeleton>">
-              <s-user-card-delayed userId="{{userId}}"></s-user-card-delayed>
-            </suspense>
+            <Suspense :fallback="<UserCardSkeleton />">
+              <UserCardDelayed :userId="userId" />
+            </Suspense>
           </div>
           <div class="bg-purple-50 p-4 rounded">
-            <suspense fallback="<s-user-card-skeleton></s-user-card-skeleton>">
-              <s-user-card-delayed-2 userId="{{userId}}"></s-user-card-delayed-2>
-            </suspense>
+            <Suspense :fallback="<UserCardSkeleton />">
+              <UserCardDelayed :userId="userId" />
+            </Suspense>
           </div>
         </div>
       </section>

@@ -1,25 +1,43 @@
 import { parseDocument, DomUtils } from "htmlparser2";
 import { render } from "dom-serializer";
 
-function evaluate(expr, scope) {
+/**
+ * return value by evaluating it against provided data
+ * @param {string} key
+ * @param {object} data
+ * @returns {any}
+ */
+function getDataValue(key, data) {
   try {
     return Function(
-      ...Object.keys(scope),
-      `return (${expr})`
-    )(...Object.values(scope));
+      ...Object.keys(data),
+      `return (${key})`
+    )(...Object.values(data));
   } catch (e) {
     return "";
   }
 }
 
+/**
+ * Checks if a DOM node is an empty text node
+ * @param {ChildNode} node
+ * @returns {boolean}
+ */
 function isEmptyTextNode(node) {
   return node.type === "text" && /^\s*$/.test(node.data);
 }
 
-function processNode(node, scope, previousRendered = false) {
+/**
+ * Processes an HTML file to extract script, template, metadata, client code, and component registry
+ * @param {ChildNode} node
+ * @param {Object} data
+ * @param {boolean} previousRendered
+ * @returns {ChildNode | ChildNode[] | null}
+ */
+function processNode(node, data, previousRendered = false) {
   if (node.type === "text") {
     node.data = node.data.replace(/\{\{(.+?)\}\}/g, (_, expr) =>
-      evaluate(expr.trim(), scope)
+      getDataValue(expr.trim(), data)
     );
     return node;
   }
@@ -27,16 +45,14 @@ function processNode(node, scope, previousRendered = false) {
   if (node.type === "tag") {
     const attrs = node.attribs || {};
 
-    // ---- v-if ----
     if ("v-if" in attrs) {
-      const show = evaluate(attrs["v-if"], scope);
+      const show = getDataValue(attrs["v-if"], data);
       delete attrs["v-if"];
       if (!show) return null;
     }
 
-    // ---- v-else / v-else-if ----
     if ("v-else-if" in attrs) {
-      const show = evaluate(attrs["v-else-if"], scope);
+      const show = getDataValue(attrs["v-else-if"], data);
       delete attrs["v-else-if"];
       if (previousRendered || !show) return null;
     }
@@ -44,20 +60,18 @@ function processNode(node, scope, previousRendered = false) {
     if ("v-else" in attrs) {
       delete attrs["v-else"];
       if (previousRendered) {
-        return null; // no renderizamos porque el anterior sí se mostró
+        return null;
       }
     }
 
-    // ---- v-show ----
     if ("v-show" in attrs) {
-      const show = evaluate(attrs["v-show"], scope);
+      const show = getDataValue(attrs["v-show"], data);
       delete attrs["v-show"];
       if (!show) {
         attrs.style = (attrs.style || "") + "display:none;";
       }
     }
 
-    // ---- v-for ----
     if ("v-for" in attrs) {
       const exp = attrs["v-for"];
       delete attrs["v-for"];
@@ -68,7 +82,7 @@ function processNode(node, scope, previousRendered = false) {
 
       const itemName = match[1].trim();
       const listExpr = match[2].trim();
-      const list = evaluate(listExpr, scope);
+      const list = getDataValue(listExpr, data);
 
       if (!Array.isArray(list)) return null;
 
@@ -76,36 +90,37 @@ function processNode(node, scope, previousRendered = false) {
 
       for (const item of list) {
         const cloned = structuredClone(node);
-        const newScope = { ...scope, [itemName]: item };
-        clones.push(processNode(cloned, newScope));
+        const newData = { ...data, [itemName]: item };
+        clones.push(processNode(cloned, newData));
       }
 
       return clones;
     }
 
-    // ---- :prop and v-bind:prop ----
     for (const [name, value] of Object.entries({ ...attrs })) {
       if (name.startsWith(":")) {
+        const isSuspenseFallback =
+          name === ":fallback" && node.name === "Suspense";
         const realName = name.slice(1);
-        attrs[realName] = evaluate(value, scope);
+        attrs[realName] = !isSuspenseFallback
+          ? String(getDataValue(value, data))
+          : value;
         delete attrs[name];
       }
 
       if (name.startsWith("v-bind:")) {
         const realName = name.slice(7);
-        attrs[realName] = evaluate(value, scope);
+        attrs[realName] = String(getDataValue(value, data));
         delete attrs[name];
       }
     }
 
-    // ---- @event and v-on:event ----
     for (const [name] of Object.entries({ ...attrs })) {
       if (name.startsWith("@") || name.startsWith("v-on:")) {
         delete attrs[name];
       }
     }
 
-    // process children
     if (node.children) {
       const result = [];
       let isPreviousRendered = false;
@@ -113,7 +128,7 @@ function processNode(node, scope, previousRendered = false) {
         if (isEmptyTextNode(child)) {
           continue;
         }
-        const processed = processNode(child, scope, isPreviousRendered);
+        const processed = processNode(child, data, isPreviousRendered);
         if (Array.isArray(processed)) {
           result.push(...processed);
           isPreviousRendered = processed.length > 0;
@@ -145,19 +160,27 @@ function processNode(node, scope, previousRendered = false) {
  *  }
  * }} data
  * @returns {string}
+ *
  */
 export function compileTemplateToHTML(template, data = {}) {
-  const cleanTemplate = template
-    .replace(/[\r\n\t]+/g, " ")
-    .replace(/ +/g, " ")
-    .trim();
-  const dom = parseDocument(cleanTemplate);
+  try {
+    const cleanTemplate = template
+      .replace(/[\r\n\t]+/g, " ")
+      .replace(/ +/g, " ")
+      .trim();
 
-  const children = DomUtils.getChildren(dom);
-  const processed = children
-    .map((n) => processNode(n, data))
-    .flat()
-    .filter(Boolean);
+    // Parse HTML using xmlMode to preserve case
+    const dom = parseDocument(cleanTemplate, { xmlMode: true });
 
-  return render(processed, { encodeEntities: false });
+    const children = DomUtils.getChildren(dom);
+    const processed = children
+      .map((n) => processNode(n, data))
+      .flat()
+      .filter(Boolean);
+
+    return render(processed, { encodeEntities: false });
+  } catch (error) {
+    console.error("Error compiling template:", error);
+    throw error;
+  }
 }
