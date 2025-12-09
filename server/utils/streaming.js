@@ -21,14 +21,14 @@ function parseAttributes(raw) {
 /**
  * Renders components in HTML
  * @param {string} html
- * @param {Map} componentRegistry
+ * @param {Map<string, { path: string }>} serverComponents
  * @returns {Promise<string>}
  */
-async function processComponents(html, componentRegistry) {
+async function processServerComponents(html, serverComponents) {
   let processedHtml = html;
   const allMatches = [];
 
-  for (const [componentName, componentData] of componentRegistry.entries()) {
+  for (const [componentName, componentData] of serverComponents.entries()) {
     const escapedName = componentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const componentRegex = new RegExp(
       `<${escapedName}(?![a-zA-Z0-9_-])\\s*([^>]*?)\\s*(?:\\/>|>\\s*<\\/${escapedName}(?![a-zA-Z0-9_-])>)`,
@@ -68,12 +68,112 @@ async function processComponents(html, componentRegistry) {
   return processedHtml;
 }
 
+const cleanClientComponentPath = (path) => {
+  const normalized = path.replace(/\\/g, "/");
+  const idx = normalized.indexOf("/public");
+
+  if (idx === -1) return normalized;
+
+  return normalized.substring(idx);
+};
+
+/**
+ * Generates hydration script for a client component
+ * @param {string} componentName - Name of the component
+ * @param {string} componentPath - Path to component file
+ * @param {object} props - Component props
+ * @returns {{
+ *  htmlComponent: string
+ *  hydrateClientComponentScript: string,
+ * }} HTML script tag for hydration
+ */
+export function processClientComponent(
+  componentName,
+  componentPath,
+  props = {}
+) {
+  const targetId = `client-${componentName}-${Date.now()}`;
+  const propsJson = JSON.stringify(props);
+
+  const cleanedComponentPath = cleanClientComponentPath(componentPath);
+
+  const htmlComponent = `<div id="${targetId}"></div>`;
+
+  const hydrateClientComponentScript = `
+    <script 
+      src="/public/app/services/hydrate-client-component.js" 
+      data-component="${cleanedComponentPath}"
+      data-target="${targetId}"
+      data-props='${propsJson}'
+      async>
+    </script>
+  `;
+
+  return { hydrateClientComponentScript, htmlComponent };
+}
+
+/**
+ * Renders components in HTML and client scripts to load them
+ * @param {string} html
+ * @param {Map<string, { path: string }>} clientComponents
+ * @returns {{
+ *  html: string,
+ *  allScripts: Array<string>,
+ * }}
+ */
+function renderClientComponents(html, clientComponents) {
+  let processedHtml = html;
+  const allMatches = [];
+  const allScripts = [];
+
+  for (const [componentName, componentData] of clientComponents.entries()) {
+    const escapedName = componentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const componentRegex = new RegExp(
+      `<${escapedName}(?![a-zA-Z0-9_-])\\s*([^>]*?)\\s*(?:\\/>|>\\s*<\\/${escapedName}(?![a-zA-Z0-9_-])>)`,
+      "gi"
+    );
+
+    const replacements = [];
+    let match;
+
+    while ((match = componentRegex.exec(html)) !== null) {
+      const matchData = {
+        name: componentName,
+        attrs: parseAttributes(match[1]),
+        fullMatch: match[0],
+        start: match.index,
+        end: match.index + match[0].length,
+      };
+
+      replacements.push(matchData);
+      allMatches.push(matchData);
+    }
+
+    // Render in reverse order to maintain indices
+    for (let i = replacements.length - 1; i >= 0; i--) {
+      const { start, end, attrs } = replacements[i];
+
+      const { hydrateClientComponentScript, htmlComponent } =
+        processClientComponent(componentName, componentData.path, attrs);
+
+      allScripts.push(hydrateClientComponentScript);
+
+      processedHtml =
+        processedHtml.slice(0, start) +
+        htmlComponent +
+        processedHtml.slice(end);
+    }
+  }
+
+  return { html: processedHtml, allScripts };
+}
+
 /**
  * Renders server components, handling both regular and suspense boundaries
  * Server components without suspense are rendered immediately.
  * Server components inside <Suspense> boundaries are saved in suspenseComponents.
  * @param {string} pageHtml
- * @param {Map<string, {getData: Function, template: string}>} componentRegistry
+ * @param {Map<string, { path: string }>} serverComponents
  * @returns {Promise<{
  *   html: string,
  *   suspenseComponents: Array<{
@@ -82,10 +182,7 @@ async function processComponents(html, componentRegistry) {
  *   }>
  * }>}
  */
-export async function renderServerComponents(
-  pageHtml,
-  componentRegistry = new Map()
-) {
+async function renderServerComponents(pageHtml, serverComponents = new Map()) {
   const suspenseComponents = [];
   let suspenseId = 0;
   let html = pageHtml;
@@ -99,7 +196,10 @@ export async function renderServerComponents(
     const [fullMatch, fallback, content] = match;
 
     // Render components in fallback
-    const fallbackHtml = await processComponents(fallback, componentRegistry);
+    const fallbackHtml = await processServerComponents(
+      fallback,
+      serverComponents
+    );
 
     suspenseComponents.push({
       id,
@@ -114,9 +214,43 @@ export async function renderServerComponents(
   }
 
   // Render all non-suspended components
-  html = await processComponents(html, componentRegistry);
+  html = await processServerComponents(html, serverComponents);
 
   return { html, suspenseComponents };
+}
+
+/**
+ * Renders server components, client components in HTML, suspense components and client scripts to load client components
+ * @param {{
+ *  pageHtml: string,
+ *  serverComponents: Map<string, { path: string }>,
+ *  clientComponents: Map<string, { path: string }>,
+ * }}
+ * @returns {Promise<{
+ *   html: string,
+ *   clientComponentsScripts: Array<string>,
+ *   suspenseComponents: Array<{
+ *    id: string,
+ *    content: string,
+ *   }>
+ * }>}
+ */
+export async function renderComponents({
+  html,
+  serverComponents = new Map(),
+  clientComponents = new Map(),
+}) {
+  const { html: htmlServerComponents, suspenseComponents } =
+    await renderServerComponents(html, serverComponents);
+
+  const { html: htmlClientComponents, allScripts: clientComponentsScripts } =
+    renderClientComponents(htmlServerComponents, clientComponents);
+
+  return {
+    html: htmlClientComponents,
+    suspenseComponents,
+    clientComponentsScripts,
+  };
 }
 
 /**
@@ -138,16 +272,16 @@ export function generateReplacementContent(suspenseId, renderedContent) {
  *   content: string,
  *   components: Array<{name: string, attrs: object, fullMatch: string}>
  * }} suspenseComponent
- * @param {Map} componentRegistry
+ * @param {Map<string, { path: string }>} serverComponents
  * @returns {Promise<string>}
  */
 export async function renderSuspenseComponent(
   suspenseComponent,
-  componentRegistry
+  serverComponents
 ) {
-  const html = await processComponents(
+  const html = await processServerComponents(
     suspenseComponent.content,
-    componentRegistry
+    serverComponents
   );
 
   return html;

@@ -4,7 +4,7 @@ import fs from "fs/promises";
 import { compileTemplateToHTML } from "./utils/template.js";
 import { renderHtmlFile } from "./utils/component-processor.js";
 import {
-  renderServerComponents,
+  renderComponents,
   renderSuspenseComponent,
   generateReplacementContent,
 } from "./utils/streaming.js";
@@ -52,9 +52,16 @@ const getLayoutTemplate = async () => {
  * @param {string} clientCode
  * @returns {string}
  */
-function generateClientScriptTag(clientCode) {
+function generateClientScriptTags(clientCode, componentScrips) {
   if (!clientCode) return "";
-  return `<script type="module" async>\n${clientCode}\n</script>`;
+
+  // clientCode es un string, eliminamos imports que terminen en .html
+  const clientCodeWithoutComponentImports = clientCode
+    .split("\n")
+    .filter((line) => !/^\s*import\s+.*['"].*\.html['"]/.test(line))
+    .join("\n");
+
+  return `<script type="module" async>\n${clientCodeWithoutComponentImports}\n</script>\n${componentScrips}`;
 }
 
 /**
@@ -72,22 +79,34 @@ const sendResponse = (res, statusCode, html) => {
  * Renders a page with layout and streaming support
  * @param {string} pagePath - Full path to page.html
  * @param {any} data - Additional data to pass to getData
- * @returns {Promise<{html: string, suspenseComponents: Array}>}
+ * @returns {Promise<{
+ *  html: string,
+ *  suspenseComponents: Array<{id: string, content: string}>,
+ *  serverComponents: Map<string, { path: string }>,
+ *  clientComponents: Map<string, { path: string }>
+ * }>}
  */
 async function renderPageWithLayout(pagePath, data = null) {
-  const {
-    html: pageHtml,
-    metadata,
-    clientCode,
-    componentRegistry,
-  } = await renderHtmlFile(pagePath, data);
+  const { html, metadata, clientCode, serverComponents, clientComponents } =
+    await renderHtmlFile(pagePath, data);
 
   // Process server components and suspense
-  const { html: processedHtml, suspenseComponents } =
-    await renderServerComponents(pageHtml, componentRegistry);
+  const {
+    html: processedHtml,
+    suspenseComponents,
+    clientComponentsScripts,
+  } = await renderComponents({
+    html,
+    serverComponents,
+    clientComponents,
+  });
 
   // Wrap in layout
-  const clientScripts = generateClientScriptTag(clientCode);
+  const clientScripts = generateClientScriptTags(
+    clientCode,
+    clientComponentsScripts.join("\n")
+  );
+
   const layoutTemplate = await getLayoutTemplate();
   const fullHtml = compileTemplateToHTML(layoutTemplate, {
     children: processedHtml,
@@ -95,7 +114,12 @@ async function renderPageWithLayout(pagePath, data = null) {
     metadata: { ...DEFAULT_METADATA, ...metadata },
   });
 
-  return { html: fullHtml, suspenseComponents, componentRegistry };
+  return {
+    html: fullHtml,
+    suspenseComponents,
+    serverComponents,
+    clientComponents,
+  };
 }
 
 /**
@@ -112,7 +136,7 @@ async function renderAndSend(
   additionalData = null
 ) {
   const pagePath = getPagePath(pageName);
-  const { html, suspenseComponents, componentRegistry } =
+  const { html, suspenseComponents, serverComponents } =
     await renderPageWithLayout(pagePath, additionalData);
 
   // if no suspense components, send immediately
@@ -137,7 +161,7 @@ async function renderAndSend(
     try {
       const renderedContent = await renderSuspenseComponent(
         suspenseComponent,
-        componentRegistry
+        serverComponents
       );
 
       const replacementContent = generateReplacementContent(
