@@ -3,16 +3,16 @@ import { render } from "dom-serializer";
 
 /**
  * return value by evaluating it against provided data
- * @param {string} key
- * @param {object} data
+ * @param {string} expression
+ * @param {object} scope
  * @returns {any}
  */
-function getDataValue(key, data) {
+function getDataValue(expression, scope) {
   try {
     return Function(
-      ...Object.keys(data),
-      `return (${key})`
-    )(...Object.values(data));
+      ...Object.keys(scope),
+      `return (${expression})`
+    )(...Object.values(scope));
   } catch (e) {
     return "";
   }
@@ -30,14 +30,14 @@ function isEmptyTextNode(node) {
 /**
  * Processes an HTML file to extract script, template, metadata, client code, and component registry
  * @param {ChildNode} node
- * @param {Object} data
+ * @param {Object} scope
  * @param {boolean} previousRendered
  * @returns {ChildNode | ChildNode[] | null}
  */
-function processNode(node, data, previousRendered = false) {
+function processNode(node, scope, previousRendered = false) {
   if (node.type === "text") {
     node.data = node.data.replace(/\{\{(.+?)\}\}/g, (_, expr) =>
-      getDataValue(expr.trim(), data)
+      getDataValue(expr.trim(), scope)
     );
     return node;
   }
@@ -46,13 +46,13 @@ function processNode(node, data, previousRendered = false) {
     const attrs = node.attribs || {};
 
     if ("v-if" in attrs) {
-      const show = getDataValue(attrs["v-if"], data);
+      const show = getDataValue(attrs["v-if"], scope);
       delete attrs["v-if"];
       if (!show) return null;
     }
 
     if ("v-else-if" in attrs) {
-      const show = getDataValue(attrs["v-else-if"], data);
+      const show = getDataValue(attrs["v-else-if"], scope);
       delete attrs["v-else-if"];
       if (previousRendered || !show) return null;
     }
@@ -65,7 +65,7 @@ function processNode(node, data, previousRendered = false) {
     }
 
     if ("v-show" in attrs) {
-      const show = getDataValue(attrs["v-show"], data);
+      const show = getDataValue(attrs["v-show"], scope);
       delete attrs["v-show"];
       if (!show) {
         attrs.style = (attrs.style || "") + "display:none;";
@@ -82,7 +82,7 @@ function processNode(node, data, previousRendered = false) {
 
       const itemName = match[1].trim();
       const listExpr = match[2].trim();
-      const list = getDataValue(listExpr, data);
+      const list = getDataValue(listExpr, scope);
 
       if (!Array.isArray(list)) return null;
 
@@ -90,8 +90,8 @@ function processNode(node, data, previousRendered = false) {
 
       for (const item of list) {
         const cloned = structuredClone(node);
-        const newData = { ...data, [itemName]: item };
-        clones.push(processNode(cloned, newData));
+        const newScope = { ...scope, [itemName]: item };
+        clones.push(processNode(cloned, newScope));
       }
 
       return clones;
@@ -103,14 +103,14 @@ function processNode(node, data, previousRendered = false) {
           name === ":fallback" && node.name === "Suspense";
         const realName = name.slice(1);
         attrs[realName] = !isSuspenseFallback
-          ? String(getDataValue(value, data))
+          ? String(getDataValue(value, scope))
           : value;
         delete attrs[name];
       }
 
       if (name.startsWith("v-bind:")) {
         const realName = name.slice(7);
-        attrs[realName] = String(getDataValue(value, data));
+        attrs[realName] = String(getDataValue(value, scope));
         delete attrs[name];
       }
     }
@@ -128,7 +128,7 @@ function processNode(node, data, previousRendered = false) {
         if (isEmptyTextNode(child)) {
           continue;
         }
-        const processed = processNode(child, data, isPreviousRendered);
+        const processed = processNode(child, scope, isPreviousRendered);
         if (Array.isArray(processed)) {
           result.push(...processed);
           isPreviousRendered = processed.length > 0;
