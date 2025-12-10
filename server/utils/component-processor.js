@@ -255,26 +255,30 @@ export async function generateClientComponentInline(
   const convertedTemplate = convertVueToHtmlTagged(template, finalClientCode);
 
   return `
-    <div id="${targetId}"></div>
+    <template id="${targetId}"></template>
     <script type="module">
       import { effect } from '/public/app/services/reactive.js';
       import { html } from '/public/app/services/html.js';
       
       ${finalClientCode}
       
-      const target = document.getElementById('${targetId}');
-      
+      const marker = document.getElementById('${targetId}');
+      let root = null;
+
       function render() {
-        return html\`${convertedTemplate}\`;
+        const node = html\`${convertedTemplate}\`;  
+        if (!root) {
+          root = node;
+          marker.replaceWith(node);
+          return;
+        }
+
+        root.replaceWith(node);
+        root = node;
       }
-        
-      effect(() => {
-        console.warn('Effect triggered for component: ${componentName}');
-        if (!target) return;
-        console.warn('exist target');
-        const newContent = render();
-        target.innerHTML = '';
-        target.appendChild(newContent);
+
+      effect(() => {        
+        render();
       });
     </script>
   `;
