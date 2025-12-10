@@ -9,13 +9,15 @@ const rootPath = path.resolve(__dirname, "..", "..");
 
 /**
  * Process script and return components imports and the rest imports
+ * If isClientSide, only return HTML components map. This is to avoid importing JS modules of client side in the server.
  * @param {string} script
+ * @param {boolean} isClientSide
  * @returns {Promise<{
  *   imports: Object,
  *   componentRegistry: Map<string, { path: string }>
  * }>}
  */
-const getScriptImports = async (script) => {
+const getScriptImports = async (script, isClientSide = false) => {
   const componentRegistry = new Map();
   const imports = {};
   const importRegex =
@@ -34,7 +36,7 @@ const getScriptImports = async (script) => {
       if (defaultImport) {
         componentRegistry.set(defaultImport, { path: resolvedPath });
       }
-    } else {
+    } else if (!isClientSide) {
       // Import JS module
       const module = await import(fileUrl);
       if (defaultImport) {
@@ -121,7 +123,7 @@ export async function processHtmlFile(filePath) {
   }
 
   if (clientMatch) {
-    const { componentRegistry } = await getScriptImports(clientMatch[1]);
+    const { componentRegistry } = await getScriptImports(clientMatch[1], true);
     clientComponents = componentRegistry;
   }
 
@@ -161,4 +163,193 @@ export async function renderHtmlFile(filePath, data = null) {
   const html = compileTemplateToHTML(template, componentData);
 
   return { html, metadata, clientCode, serverComponents, clientComponents };
+}
+
+/**
+ * Converts template syntax to html`` tagged template syntax
+ * Client has access to html function that knows how to render the return value.
+ * @param {string} template
+ * @param {string} clientCode - Client code to detect reactive variables
+ * @returns {string} Converted template
+ */
+function convertVueToHtmlTagged(template, clientCode = "") {
+  // Extract reactive variables from client code (only those created with ractive modules)
+  const reactiveVars = new Set();
+  const reactiveRegex =
+    /(?:const|let|var)\s+(\w+)\s*=\s*(?:reactive|computed)\(/g;
+
+  let match;
+
+  while ((match = reactiveRegex.exec(clientCode)) !== null) {
+    reactiveVars.add(match[1]);
+  }
+
+  /**
+   * Helper to add .value only to reactive variables
+   * Preserves member access (e.g., counter.value stays as counter.value)
+   * Preserves method calls (e.g., increment() stays as increment())
+   */
+  const processExpression = (expr) => {
+    return expr.replace(/\b(\w+)(?!\s*[\.\(])/g, (_, varName) => {
+      return reactiveVars.has(varName) ? `${varName}.value` : varName;
+    });
+  };
+
+  let result = template;
+
+  // v-for="item in items" → ${items.value.map(item => html`...`)}
+  result = result.replace(
+    /<(\w+)([^>]*)\s+v-for="(\w+)\s+in\s+(\w+)(?:\.value)?"([^>]*)>([\s\S]*?)<\/\1>/g,
+    (_, tag, beforeAttrs, iterVar, arrayVar, afterAttrs, content) => {
+      // Add .value if it's a reactive variable
+      const arrayAccess = reactiveVars.has(arrayVar)
+        ? `${arrayVar}.value`
+        : arrayVar;
+
+      return `\${${arrayAccess}.map(${iterVar} => html\`<${tag}${beforeAttrs}${afterAttrs}>${content}</${tag}>\`)}`;
+    }
+  );
+
+  // v-show="condition" → :hidden="${!condition.value}" (add .value for reactive vars)
+  result = result.replace(/v-show="([^"]+)"/g, (_, condition) => {
+    return `:hidden="\${!(${processExpression(condition)})}"`;
+  });
+
+  // {{variable}} → ${variable.value} (for reactive vars)
+  result = result.replace(/\{\{([^}]+)\}\}/g, (_, expr) => {
+    return `\${${processExpression(expr.trim())}}`;
+  });
+
+  // @click="handler" → @click="${handler}" (no .value for functions)
+  result = result.replace(/@(\w+)="([^"]+)"/g, '@$1="${$2}"');
+
+  // :prop="value" → :prop="${value.value}" (for reactive vars, but skip already processed ${...})
+  result = result.replace(/:(\w+)="(?!\$\{)([^"]+)"/g, (_, attr, value) => {
+    return `:${attr}="\${${processExpression(value)}}"`;
+  });
+
+  return result;
+}
+
+/**
+ * Generates inlined client component with pre-compiled template
+ * @param {string} componentName
+ * @param {string} componentPath
+ * @param {object} props
+ * @returns {Promise<string>}
+ */
+export async function generateClientComponentInline(
+  componentName,
+  componentPath,
+  props = {}
+) {
+  const targetId = `client-${componentName}-${Date.now()}`;
+
+  // Read and process component
+  const { clientCode, template } = await processHtmlFile(componentPath);
+
+  // Compute final props with defaults
+  const finalClientCode = addComputedProps(clientCode, props);
+
+  // Convert Vue syntax to html`` tagged template (pass clientCode to detect reactive vars)
+  const convertedTemplate = convertVueToHtmlTagged(template, finalClientCode);
+
+  return `
+    <div id="${targetId}"></div>
+    <script type="module">
+      import { effect } from '/public/app/services/reactive.js';
+      import { html } from '/public/app/services/html.js';
+      
+      ${finalClientCode}
+      
+      const target = document.getElementById('${targetId}');
+      
+      function render() {
+        return html\`${convertedTemplate}\`;
+      }
+        
+      effect(() => {
+        console.warn('Effect triggered for component: ${componentName}');
+        if (!target) return;
+        console.warn('exist target');
+        const newContent = render();
+        target.innerHTML = '';
+        target.appendChild(newContent);
+      });
+    </script>
+  `;
+}
+
+/**
+ * Extract vprops object literal from client code
+ * @param {string} clientCode
+ * @returns {string | null}
+ */
+function extractVPropsObject(clientCode) {
+  const match = clientCode.match(/vprops\s*\(\s*(\{[\s\S]*?\})\s*\)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Avoid execute expressions with side effects like function calls, if, loops, etc.
+ * @param {string} objectLiteral
+ * @returns {object}
+ */
+function safeObjectEval(objectLiteral) {
+  return Function(`"use strict"; return (${objectLiteral})`)();
+}
+
+/**
+ * Applies default props from vprops definition
+ * @param {object} vpropsDef
+ * @param {object} componentProps
+ * @returns {object}
+ */
+function applyDefaultProps(vpropsDefined, componentProps) {
+  const finalProps = {};
+  for (const key in vpropsDefined) {
+    const def = vpropsDefined[key];
+    if (key in componentProps) {
+      finalProps[key] = componentProps[key];
+    } else if ("default" in def) {
+      finalProps[key] = def.default;
+    } else {
+      finalProps[key] = undefined;
+    }
+  }
+
+  return finalProps;
+}
+
+/**
+ * Compute props used in the client code
+ * @param {string} clientCode
+ * @param {object} componentProps
+ */
+function computeProps(clientCode, componentProps) {
+  const vpropsLiteral = extractVPropsObject(clientCode);
+
+  if (!vpropsLiteral) return componentProps;
+
+  const vpropsDefined = safeObjectEval(vpropsLiteral);
+
+  return applyDefaultProps(vpropsDefined, componentProps);
+}
+
+/**
+ * Adds computed props to client code if are defined.
+ * Replaces vprops(...) by const props = { ... };
+ * @param {string} clientCode
+ * @param {object} componentProps
+ */
+function addComputedProps(clientCode, componentProps) {
+  const vpropsRegex = /const\s+props\s*=\s*vprops\s*\([\s\S]*?\)\s*;?/;
+  if (!vpropsRegex.test(clientCode)) return clientCode;
+
+  const computedProps = computeProps(clientCode, componentProps);
+
+  return clientCode.replace(
+    vpropsRegex,
+    `const props = ${JSON.stringify(computedProps)};`
+  );
 }

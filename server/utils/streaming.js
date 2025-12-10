@@ -1,4 +1,7 @@
-import { renderHtmlFile } from "./component-processor.js";
+import {
+  generateClientComponentInline,
+  renderHtmlFile,
+} from "./component-processor.js";
 
 // processNode of compileTemplateToHTML remove binding characters (:)
 const suspenseRegex = /<Suspense\s+fallback="([^"]*)">([\s\S]*?)<\/Suspense>/g;
@@ -78,50 +81,38 @@ const cleanClientComponentPath = (path) => {
 };
 
 /**
- * Generates hydration script for a client component
+ * Generates html component content with hydration script
  * @param {string} componentName - Name of the component
  * @param {string} componentPath - Path to component file
  * @param {object} props - Component props
- * @returns {{
- *  htmlComponent: string
- *  hydrateClientComponentScript: string,
- * }} HTML script tag for hydration
+ * @returns {Promise<string>} HTML string with component and hydration script
  */
-export function processClientComponent(
+export async function processClientComponent(
   componentName,
   componentPath,
   props = {}
 ) {
-  const targetId = `client-${componentName}-${Date.now()}`;
-  const propsJson = JSON.stringify(props);
-
   const cleanedComponentPath = cleanClientComponentPath(componentPath);
 
-  const htmlComponent = `<div id="${targetId}"></div>`;
+  const inlineComponent = await generateClientComponentInline(
+    componentName,
+    cleanedComponentPath,
+    props
+  );
 
-  const hydrateClientComponentScript = `
-    <script 
-      src="/public/app/services/hydrate-client-component.js" 
-      data-component="${cleanedComponentPath}"
-      data-target="${targetId}"
-      data-props='${propsJson}'
-      async>
-    </script>
-  `;
-
-  return { hydrateClientComponentScript, htmlComponent };
+  return inlineComponent;
 }
 
 /**
  * Renders components in HTML and client scripts to load them
  * @param {string} html
  * @param {Map<string, { path: string }>} clientComponents
- * @returns {{
+ * @returns {Promise<{
  *  html: string,
  *  allScripts: Array<string>,
- * }}
+ * }>}
  */
-function renderClientComponents(html, clientComponents) {
+async function renderClientComponents(html, clientComponents) {
   let processedHtml = html;
   const allMatches = [];
   const allScripts = [];
@@ -153,10 +144,11 @@ function renderClientComponents(html, clientComponents) {
     for (let i = replacements.length - 1; i >= 0; i--) {
       const { start, end, attrs } = replacements[i];
 
-      const { hydrateClientComponentScript, htmlComponent } =
-        processClientComponent(componentName, componentData.path, attrs);
-
-      allScripts.push(hydrateClientComponentScript);
+      const htmlComponent = await processClientComponent(
+        componentName,
+        componentData.path,
+        attrs
+      );
 
       processedHtml =
         processedHtml.slice(0, start) +
@@ -244,7 +236,7 @@ export async function renderComponents({
     await renderServerComponents(html, serverComponents);
 
   const { html: htmlClientComponents, allScripts: clientComponentsScripts } =
-    renderClientComponents(htmlServerComponents, clientComponents);
+    await renderClientComponents(htmlServerComponents, clientComponents);
 
   return {
     html: htmlClientComponents,

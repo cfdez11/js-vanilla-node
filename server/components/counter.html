@@ -1,5 +1,5 @@
 <script client>
-  import { reactive } from "/public/app/services/reactive.js";
+  import { reactive, computed } from "/public/app/services/reactive.js";
 
   /** @type {{ start: string }} */
   const props = vprops({
@@ -9,14 +9,17 @@
   const counter = reactive(props.start);
 
   function increment () {
+    console.warn('Increment called');
     counter.value++;
   }
 
   function decrement () {
+    console.warn('Decrement called');
     counter.value--;
   }
 
-  const stars = Array.from({ length: counter.value }, () => "star");
+
+  const stars = computed(() => Array.from({ length: counter.value }, () => "⭐"));
 
 </script>
 <template>

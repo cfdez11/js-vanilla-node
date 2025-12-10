@@ -52,7 +52,7 @@ const getLayoutTemplate = async () => {
  * @param {string} clientCode
  * @returns {string}
  */
-function generateClientScriptTags(clientCode, componentScrips) {
+function generateClientScriptTags(clientCode, componentScrips = []) {
   if (!clientCode) return "";
 
   // clientCode es un string, eliminamos imports que terminen en .html
@@ -94,7 +94,7 @@ async function renderPageWithLayout(pagePath, data = null) {
   const {
     html: processedHtml,
     suspenseComponents,
-    clientComponentsScripts,
+    clientComponentsScripts = [],
   } = await renderComponents({
     html,
     serverComponents,
@@ -129,7 +129,7 @@ async function renderPageWithLayout(pagePath, data = null) {
  * @param {number} statusCode
  * @param {any} additionalData
  */
-async function renderAndSend(
+async function renderAndSendPage(
   res,
   pageName,
   statusCode = 200,
@@ -203,7 +203,7 @@ export async function handlePageRequest(req, res, route) {
   const pageName = route.path.slice(1);
 
   try {
-    await renderAndSend(res, pageName);
+    await renderAndSendPage(res, pageName);
   } catch (e) {
     const errorData = {
       message: e.message || "Internal server error",
@@ -214,7 +214,7 @@ export async function handlePageRequest(req, res, route) {
     };
 
     try {
-      await renderAndSend(res, "error", 500, errorData);
+      await renderAndSendPage(res, "error", 500, errorData);
     } catch (err) {
       console.error(`Failed to render error page: ${err.message}`);
       sendResponse(res, 500, FALLBACK_ERROR_HTML);
