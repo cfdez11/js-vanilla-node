@@ -2,7 +2,11 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { handlePageRequest } from "./router.js";
-import { errorRoute, notFoundRoute, routes } from "./_app/routes.js"; // importa tambien el movie page por lo que hace fallar el html element not defined, hay que hacerlo de otra forma
+import { errorRoute, notFoundRoute, routes } from "./_app/routes.js"; // importa tambien el movie
+import { generateAllClientComponents } from "./utils/component-processor.js";
+
+// Pre-generate all client components to have their import statements ready
+generateAllClientComponents();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

@@ -50,18 +50,37 @@ const getLayoutTemplate = async () => {
 /**
  * Generates client script tag
  * @param {string} clientCode
+ * @param {Array<string>} componentScripts
+ * @param {
+ *  Map<string, {
+ *    path: string,
+ *    originalPath: string,
+ *    importStatement: string
+ *  }>} clientComponents
  * @returns {string}
  */
-function generateClientScriptTags(clientCode, componentScrips = []) {
+function generateClientScriptTags(
+  clientCode,
+  componentScripts = [],
+  clientComponents = new Map()
+) {
   if (!clientCode) return "";
+  // replace component imports to point to .js files
+  for (const { importStatement } of clientComponents.values()) {
+    clientCode = clientCode.replace(importStatement, "");
+  }
 
-  // clientCode es un string, eliminamos imports que terminen en .html
   const clientCodeWithoutComponentImports = clientCode
     .split("\n")
     .filter((line) => !/^\s*import\s+.*['"].*\.html['"]/.test(line))
     .join("\n");
 
-  return `<script type="module" async>\n${clientCodeWithoutComponentImports}\n</script>\n${componentScrips}`;
+  const scripts = `
+    <script src="/public/app/services/hydrate-client-components.js"></script>
+    <script type="module">\n${clientCodeWithoutComponentImports}\n</script>\n${componentScripts}
+  `;
+
+  return scripts.trim();
 }
 
 /**
@@ -104,7 +123,8 @@ async function renderPageWithLayout(pagePath, data = null) {
   // Wrap in layout
   const clientScripts = generateClientScriptTags(
     clientCode,
-    clientComponentsScripts.join("\n")
+    clientComponentsScripts.join("\n"),
+    clientComponents
   );
 
   const layoutTemplate = await getLayoutTemplate();

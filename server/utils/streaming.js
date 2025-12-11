@@ -1,5 +1,5 @@
 import {
-  generateClientComponentInline,
+  processClientComponent,
   renderHtmlFile,
 } from "./component-processor.js";
 
@@ -81,29 +81,6 @@ const cleanClientComponentPath = (path) => {
 };
 
 /**
- * Generates html component content with hydration script
- * @param {string} componentName - Name of the component
- * @param {string} componentPath - Path to component file
- * @param {object} props - Component props
- * @returns {Promise<string>} HTML string with component and hydration script
- */
-export async function processClientComponent(
-  componentName,
-  componentPath,
-  props = {}
-) {
-  const cleanedComponentPath = cleanClientComponentPath(componentPath);
-
-  const inlineComponent = await generateClientComponentInline(
-    componentName,
-    cleanedComponentPath,
-    props
-  );
-
-  return inlineComponent;
-}
-
-/**
  * Renders components in HTML and client scripts to load them
  * @param {string} html
  * @param {Map<string, { path: string }>} clientComponents
@@ -142,13 +119,9 @@ async function renderClientComponents(html, clientComponents) {
 
     // Render in reverse order to maintain indices
     for (let i = replacements.length - 1; i >= 0; i--) {
-      const { start, end, attrs } = replacements[i];
+      const { start, end } = replacements[i];
 
-      const htmlComponent = await processClientComponent(
-        componentName,
-        componentData.path,
-        attrs
-      );
+      const htmlComponent = await processClientComponent(componentName);
 
       processedHtml =
         processedHtml.slice(0, start) +
@@ -254,7 +227,7 @@ export async function renderComponents({
  */
 export function generateReplacementContent(suspenseId, renderedContent) {
   const contentId = `${suspenseId}-content`;
-  return `<template id="${contentId}">${renderedContent}</template><script src="/public/app/services/hydrate.js" data-target="${suspenseId}" data-source="${contentId}" async></script>`;
+  return `<template id="${contentId}">${renderedContent}</template><script src="/public/app/services/hydrate.js" data-target="${suspenseId}" data-source="${contentId}" defer></script>`;
 }
 
 /**
