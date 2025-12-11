@@ -315,7 +315,7 @@ pnpm format       # Format code with Biome
 Future features planned for implementation:
 
 - [x] **Language sintaxis** - Unify sintaxis to use same conditional tags, lists, etc in server and client.
-- [ ] **Inject client component script** - Use other technique to inject js in client, to avoid have scripts in html, check Nextjs, svelte, vue
+- [x] **Inject client component script** - Use other technique to inject js in client, to avoid have scripts in html, check Nextjs, svelte, vue
 - [ ] **Static Incremental Regeneration** - Regenerate static pages on-demand
 - [ ] **Generate Static Params** - Pre-generate pages with dynamic routes at build time
 - [ ] **Cache getData** - Implement caching layer for data fetching functions
