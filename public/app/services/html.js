@@ -47,7 +47,9 @@ export function html(strings, ...values) {
   // Process the fragment and replace markers
   processNode(fragment, markers, values);
 
-  return fragment;
+  return fragment.childElementCount === 1
+    ? fragment.firstElementChild
+    : fragment;
 }
 
 /**

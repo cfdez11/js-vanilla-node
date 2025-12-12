@@ -159,3 +159,30 @@ export function effect(fn) {
     }
   };
 }
+
+/**
+ * Creates a computed reactive value that automatically updates when its dependencies change.
+ * @param {Function} getter
+ * @returns {{ value: Object }} Computed reactive value
+ *
+ * @example
+ * Basic usage
+ * const count = reactive(1);
+ * const doubleCount = computed(() => count.value * 2);
+ * console.log(doubleCount.value); // 2
+ * count.value = 3;
+ * console.log(doubleCount.value); // 6
+ */
+export function computed(getter) {
+  let value;
+
+  effect(() => {
+    value = getter();
+  });
+
+  return {
+    get value() {
+      return value;
+    },
+  };
+}

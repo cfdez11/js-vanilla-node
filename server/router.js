@@ -1,14 +1,14 @@
 import path from "path";
-import { fileURLToPath, pathToFileURL } from "url";
-import { renderTemplate } from "./utils/template.js";
+import { fileURLToPath } from "url";
+import fs from "fs/promises";
+import { compileTemplateToHTML } from "./utils/template.js";
+import { renderHtmlFile } from "./utils/component-processor.js";
 import {
-  extractSuspenseBoundaries,
-  renderNonSuspendedComponents,
-  renderSuspenseContent,
+  renderComponents,
+  renderSuspenseComponent,
   generateReplacementContent,
 } from "./utils/streaming.js";
 import { errorRoute, notFoundRoute } from "./_app/routes.js";
-import fs from "fs/promises";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PAGES_DIR = path.resolve(__dirname, "..", "pages");
@@ -33,14 +33,58 @@ const FALLBACK_ERROR_HTML = `
 /**
  * Builds the path to a page file
  * @param {string} pageName
- * @param {string} file
  * @returns {string}
  */
-const getPagePath = (pageName, file = "page.html") =>
-  path.resolve(PAGES_DIR, pageName, file);
+const getPagePath = (pageName) =>
+  path.resolve(PAGES_DIR, pageName, "page.html");
 
 /**
- * Sends HTML response to client and close request
+ * Retrieves layout HTML string
+ * @returns {Promise<string>}
+ */
+const getLayoutTemplate = async () => {
+  const layoutPath = path.resolve(PAGES_DIR, "layout.html");
+  return await fs.readFile(layoutPath, "utf-8");
+};
+
+/**
+ * Generates client script tag
+ * @param {string} clientCode
+ * @param {Array<string>} componentScripts
+ * @param {
+ *  Map<string, {
+ *    path: string,
+ *    originalPath: string,
+ *    importStatement: string
+ *  }>} clientComponents
+ * @returns {string}
+ */
+function generateClientScriptTags(
+  clientCode,
+  componentScripts = [],
+  clientComponents = new Map()
+) {
+  if (!clientCode) return "";
+  // replace component imports to point to .js files
+  for (const { importStatement } of clientComponents.values()) {
+    clientCode = clientCode.replace(importStatement, "");
+  }
+
+  const clientCodeWithoutComponentImports = clientCode
+    .split("\n")
+    .filter((line) => !/^\s*import\s+.*['"].*\.html['"]/.test(line))
+    .join("\n");
+
+  const scripts = `
+    <script src="/public/app/services/hydrate-client-components.js"></script>
+    <script type="module">\n${clientCodeWithoutComponentImports}\n</script>\n${componentScripts}
+  `;
+
+  return scripts.trim();
+}
+
+/**
+ * Sends HTML response
  * @param {import("http").ServerResponse} res
  * @param {number} statusCode
  * @param {string} html
@@ -51,174 +95,73 @@ const sendResponse = (res, statusCode, html) => {
 };
 
 /**
- * Extracts server script, client script from HTML page
- * @param {string} pageContent
+ * Renders a page with layout and streaming support
+ * @param {string} pagePath - Full path to page.html
+ * @param {any} data - Additional data to pass to getData
  * @returns {Promise<{
- *  getData: Function | null,
- *  metadata: {
- *  title?: string,
- *  description?: string,
- * },
- *  clientCode: string
+ *  html: string,
+ *  suspenseComponents: Array<{id: string, content: string}>,
+ *  serverComponents: Map<string, { path: string, originalPath: string, importStatement: string }>,
+ *  clientComponents: Map<string, { path: string, originalPath: string, importStatement: string }>
  * }>}
  */
-async function extractPageScripts(pageContent, pagePath) {
-  const serverMatch = pageContent.match(/<script server>([\s\S]*?)<\/script>/);
-  const clientMatch = pageContent.match(/<script client>([\s\S]*?)<\/script>/);
+async function renderPageWithLayout(pagePath, data = null) {
+  const { html, metadata, clientCode, serverComponents, clientComponents } =
+    await renderHtmlFile(pagePath, data);
 
-  let getData = null;
-  let metadata = {};
-  const clientCode = clientMatch ? clientMatch[1].trim() : "";
+  // Process server components and suspense
+  const {
+    html: processedHtml,
+    suspenseComponents,
+    clientComponentsScripts = [],
+  } = await renderComponents({
+    html,
+    serverComponents,
+    clientComponents,
+  });
 
-  if (serverMatch) {
-    try {
-      // find all imports used in the server script
-      const imports = {};
-      const scriptContent = serverMatch[1];
-      const importRegex = /import\s+\{([^}]*)\}\s+from\s+['"]([^'"]*)['"]/g;
-      let match;
-
-      while ((match = importRegex.exec(scriptContent)) !== null) {
-        const importedNames = match[1].split(",").map((s) => s.trim());
-        const modulePath = match[2];
-
-        const resolvedPath = path.resolve(path.dirname(pagePath), modulePath);
-        const fileUrl = pathToFileURL(resolvedPath).href;
-        const module = await import(fileUrl);
-
-        for (const name of importedNames) {
-          imports[name] = module[name];
-        }
-      }
-
-      const cleanedScript = scriptContent
-        .replace(/import\s+\{[^}]*\}\s+from\s+['"][^'"]*['"];?\n?/g, "")
-        .replace(/import\s+\*\s+as\s+\w+\s+from\s+['"][^'"]*['"];?\n?/g, "")
-        .replace(/import\s+\w+\s+from\s+['"][^'"]*['"];?\n?/g, "")
-        .replace(/export\s+/g, "")
-        .trim();
-
-      // Get a constructor to create async functions
-      const AsyncFunction = Object.getPrototypeOf(
-        async function () {}
-      ).constructor;
-      const fn = new AsyncFunction(
-        ...Object.keys(imports),
-        `
-        ${cleanedScript}
-        return { getData, metadata: metadata || {} };
-      `
-      );
-
-      const result = await fn(...Object.values(imports));
-      getData = result.getData;
-      metadata = result.metadata;
-    } catch (error) {
-      console.warn(`Error evaluating server script: ${error.message}`);
-    }
-  }
-
-  return { getData, metadata, clientCode };
-}
-
-/**
- * Loads page and extracts data, metadata and client code
- * @param {string} pageName
- * @param {any} additionalData
- * @returns {Promise<{
- *  data: any,
- *  metadata: {
- *    title?: string,
- *    description?: string,
- *  },
- *  clientCode: string - client-side js code to run in script
- * }>}
- */
-async function loadPageTemplate(pageName, additionalData = null) {
-  try {
-    const pagePath = getPagePath(pageName);
-    const templateContent = await fs.readFile(pagePath, "utf-8");
-    const { getData, metadata, clientCode } = await extractPageScripts(
-      templateContent,
-      pagePath
-    );
-    const data = (await getData?.(additionalData)) ?? {};
-    return { data, metadata, clientCode };
-  } catch (error) {
-    throw new Error(
-      `Could not load template for page "${pageName}": ${error.message}`
-    );
-  }
-}
-
-/**
- * Generates client script tag with module type
- * @param {string} clientCode
- * @returns {string}
- */
-function generateClientScriptTag(clientCode) {
-  if (!clientCode) return "";
-  return `<script type="module" async>\n${clientCode}\n</script>`;
-}
-
-/** Renders a complete page with layout - returns initial HTML and suspense components */
-/**
- * @param {string} pageName
- * @param {any} data
- * @param {object} metadata
- * @param {string} clientCode
- * @returns {Promise<{fullHtml: string, suspenseComponents: any[]}>}
- */
-async function renderPage(pageName, data, metadata = {}, clientCode = "") {
-  let pageHtml = renderTemplate(getPagePath(pageName), data);
-
-  // First render non-suspended server components
-  pageHtml = await renderNonSuspendedComponents(pageHtml);
-
-  // Extract suspense boundaries and get initial HTML with fallbacks (now async)
-  const { initialHtml, suspenseComponents } = await extractSuspenseBoundaries(
-    pageHtml
+  // Wrap in layout
+  const clientScripts = generateClientScriptTags(
+    clientCode,
+    clientComponentsScripts.join("\n"),
+    clientComponents
   );
 
-  const clientScripts = generateClientScriptTag(clientCode);
-
-  const fullHtml = renderTemplate(path.resolve(PAGES_DIR, "layout.html"), {
-    children: initialHtml,
+  const layoutTemplate = await getLayoutTemplate();
+  const fullHtml = compileTemplateToHTML(layoutTemplate, {
+    children: processedHtml,
     clientScripts,
     metadata: { ...DEFAULT_METADATA, ...metadata },
   });
 
-  return { fullHtml, suspenseComponents };
+  return {
+    html: fullHtml,
+    suspenseComponents,
+    serverComponents,
+    clientComponents,
+  };
 }
 
 /**
- * Renders and sends a page
+ * Renders and sends a page with streaming
  * @param {import("http").ServerResponse} res
  * @param {string} pageName
  * @param {number} statusCode
  * @param {any} additionalData
- * @returns {Promise<void>}
  */
-async function renderAndSend(
+async function renderAndSendPage(
   res,
   pageName,
   statusCode = 200,
   additionalData = null
 ) {
-  const { data, metadata, clientCode } = await loadPageTemplate(
-    pageName,
-    additionalData
-  );
-  const { fullHtml, suspenseComponents } = await renderPage(
-    pageName,
-    data,
-    metadata,
-    clientCode
-  );
+  const pagePath = getPagePath(pageName);
+  const { html, suspenseComponents, serverComponents } =
+    await renderPageWithLayout(pagePath, additionalData);
 
-  // If no suspense components, send response and close request
+  // if no suspense components, send immediately
   if (suspenseComponents.length === 0) {
-    sendResponse(res, statusCode, fullHtml);
+    sendResponse(res, statusCode, html);
     return;
   }
 
@@ -229,44 +172,44 @@ async function renderAndSend(
     "X-Content-Type-Options": "nosniff",
   });
 
-  // Send initial HTML (with fallbacks) immediately
-  // Remove closing </body></html> tags to allow streaming more content
-  const [beforeClosing] = fullHtml.split("</body>");
+  // Send initial HTML (before </body>)
+  const [beforeClosing] = html.split("</body>");
   res.write(beforeClosing);
 
-  // Render suspense components in parallel and stream as they complete
-  const renderPromises = suspenseComponents.map(async (suspense) => {
+  // Stream suspense components
+  const renderPromises = suspenseComponents.map(async (suspenseComponent) => {
     try {
-      const renderedContent = await renderSuspenseContent(suspense);
+      const renderedContent = await renderSuspenseComponent(
+        suspenseComponent,
+        serverComponents
+      );
+
       const replacementContent = generateReplacementContent(
-        suspense.id,
+        suspenseComponent.id,
         renderedContent
       );
       res.write(replacementContent);
     } catch (error) {
-      console.error(`Error rendering suspense ${suspense.id}:`, error);
-      const errorReplacementContent = generateReplacementContent(
-        suspense.id,
+      console.error(`Error rendering suspense ${suspenseComponent.id}:`, error);
+      const errorContent = generateReplacementContent(
+        suspenseComponent.id,
         `<div class="text-red-500">Error loading content</div>`
       );
-      res.write(errorReplacementContent);
+      res.write(errorContent);
     }
   });
 
-  // Wait for all suspense components to complete
   await Promise.all(renderPromises);
 
-  // Close the document and response
   res.write("</body></html>");
   res.end();
 }
 
 /**
- *  Handles incoming page request
+ * Handles incoming page request
  * @param {import("http").IncomingMessage} req
  * @param {import("http").ServerResponse} res
- * @param {{ path: string, meta: { ssr: boolean, requiresAuth: boolean } }} route
- * @returns {Promise<void>}
+ * @param {{path: string, meta: object}} route
  */
 export async function handlePageRequest(req, res, route) {
   if (!route) {
@@ -280,7 +223,7 @@ export async function handlePageRequest(req, res, route) {
   const pageName = route.path.slice(1);
 
   try {
-    await renderAndSend(res, pageName);
+    await renderAndSendPage(res, pageName);
   } catch (e) {
     const errorData = {
       message: e.message || "Internal server error",
@@ -291,7 +234,7 @@ export async function handlePageRequest(req, res, route) {
     };
 
     try {
-      await renderAndSend(res, "error", 500, errorData);
+      await renderAndSendPage(res, "error", 500, errorData);
     } catch (err) {
       console.error(`Failed to render error page: ${err.message}`);
       sendResponse(res, 500, FALLBACK_ERROR_HTML);

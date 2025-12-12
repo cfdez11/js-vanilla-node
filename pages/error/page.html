@@ -1,4 +1,4 @@
-<script>
+<script server>
   export async function getData (errorData = {}) {
     return {
       error: {
@@ -41,11 +41,9 @@
           <p class="text-lg text-red-800 font-medium">
             {{error.message}}
           </p>
-          {{#if error.details}}
-          <p class="text-sm text-red-600 mt-2">
+          <p v-if="error.stack" class="text-sm text-red-600 mt-2">
             {{error.details}}
           </p>
-          {{/if}}
         </div>
       </div>
 
@@ -57,12 +55,10 @@
         <div class="text-sm text-gray-600">
           <span class="font-medium">🕐 Time:</span> {{error.timestamp}}
         </div>
-        {{#if error.stack}}
-        <details class="text-xs text-gray-500 mt-4">
+        <details v-if="error.stack" class="text-xs text-gray-500 mt-4">
           <summary class="cursor-pointer font-medium text-gray-700 hover:text-gray-900">🔍 Details </summary>
           <pre class="mt-2 p-2 bg-gray-100 rounded text-xs overflow-x-auto">{{error.stack}}</pre>
         </details>
-        {{/if}}
       </div>
 
       <!-- Action Buttons -->
