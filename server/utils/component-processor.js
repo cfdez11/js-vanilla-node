@@ -93,8 +93,8 @@ const getScriptImports = async (script, isClientSide = false) => {
  *   metadata: object,
  *   template: string,
  *   clientCode: string,
- *   serverComponents: Map<string, { path: string }>
- *   clientComponents: Map<string, { path: string }>
+ *   serverComponents: Map<string, { path: string, originalPath: string, importStatement: string }>,
+ *   clientComponents: Map<string, { path: string, originalPath: string, importStatement: string }>,
  * }>}
  */
 export async function processHtmlFile(filePath) {
@@ -176,8 +176,8 @@ export async function processHtmlFile(filePath) {
  *   html: string,
  *   metadata: object,
  *   clientCode: string,
- *   serverComponents: Map<string, { path: string }>,
- *   clientComponents: Map<string, { path: string }>,
+ *   serverComponents: Map<string, { path: string, originalPath: string, importStatement: string }>,
+ *   clientComponents: Map<string, { path: string, originalPath: string, importStatement: string }>,
  * }>}
  */
 export async function renderHtmlFile(filePath, data = null) {

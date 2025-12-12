@@ -188,8 +188,8 @@ async function renderServerComponents(pageHtml, serverComponents = new Map()) {
  * Renders server components, client components in HTML, suspense components and client scripts to load client components
  * @param {{
  *  pageHtml: string,
- *  serverComponents: Map<string, { path: string }>,
- *  clientComponents: Map<string, { path: string }>,
+ *  serverComponents: Map<string, { path: string, originalPath: string, importStatement: string }>,
+ *  clientComponents: Map<string, { path: string, originalPath: string, importStatement: string }>,
  * }}
  * @returns {Promise<{
  *   html: string,

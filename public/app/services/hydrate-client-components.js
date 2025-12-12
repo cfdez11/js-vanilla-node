@@ -1,6 +1,4 @@
-/**
- * Hydrates a single component marker
- */
+// Hydrates a single component marker
 async function hydrateMarker(marker) {
   if (marker.dataset.hydrated === "true") return;
 
@@ -15,9 +13,7 @@ async function hydrateMarker(marker) {
   }
 }
 
-/**
- * Hydrates all component markers
- */
+// Hydrates all component markers
 async function hydrateComponents(container = document) {
   const markers = container.querySelectorAll(
     "[data-client\\:component]:not([data-hydrated='true'])"
@@ -28,13 +24,9 @@ async function hydrateComponents(container = document) {
   }
 }
 
-// Enable observer only if page has streaming markers
-console.warn(
-  "  Checking for client components to hydrate...,",
-  document.readyState
-);
-
-// observe DOM changes to hydrate dynamically added components
+/**
+  Important: use observer before DOMContentLoaded because if the page response is not ended because there are streaming components, the document might not fire DOMContentLoaded event. So we need to observe from the start to hydrate client components as they are added.
+ **/ 
 const observer = new MutationObserver((mutations) => {
   mutations.forEach((mutation) => {
     mutation.addedNodes.forEach((node) => {

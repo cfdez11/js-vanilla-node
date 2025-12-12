@@ -101,8 +101,8 @@ const sendResponse = (res, statusCode, html) => {
  * @returns {Promise<{
  *  html: string,
  *  suspenseComponents: Array<{id: string, content: string}>,
- *  serverComponents: Map<string, { path: string }>,
- *  clientComponents: Map<string, { path: string }>
+ *  serverComponents: Map<string, { path: string, originalPath: string, importStatement: string }>,
+ *  clientComponents: Map<string, { path: string, originalPath: string, importStatement: string }>
  * }>}
  */
 async function renderPageWithLayout(pagePath, data = null) {
