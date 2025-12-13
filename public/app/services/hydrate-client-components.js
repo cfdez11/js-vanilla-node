@@ -50,9 +50,7 @@ observer.observe(document, { childList: true, subtree: true });
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
     hydrateComponents();
-    observer.disconnect();
   });
 } else {
   hydrateComponents();
-  observer.disconnect();
 }

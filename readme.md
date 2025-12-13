@@ -316,7 +316,9 @@ Future features planned for implementation:
 
 - [x] **Language sintaxis** - Unify sintaxis to use same conditional tags, lists, etc in server and client.
 - [x] **Inject client component script** - Use other technique to inject js in client, to avoid have scripts in html, check Nextjs, svelte, vue
-- [ ] **Static Incremental Regeneration** - Regenerate static pages on-demand
+- [ ] **Fix error replace marker** Only occurs when template has multiple childs no wrapped in div /fragment
+- [ ] **Add dynamic pages CSR and SSR** - Add dynamic routes
+- [ ] **Incremental Static Regeneration / Static Pages** - Regenerate static pages on-demand / never
 - [ ] **Generate Static Params** - Pre-generate pages with dynamic routes at build time
 - [ ] **Cache getData** - Implement caching layer for data fetching functions
 - [ ] **Cache Server Pages** - Cache rendered server pages for improved performance
@@ -324,5 +326,5 @@ Future features planned for implementation:
 - [ ] **Prefetch Pages** - Automatically prefetch pages on link hover/visibility
 - [ ] **Restructure Directories** - Optimize project structure and organization
 - [ ] **Authentication** - Built-in authentication system with middleware support
-- [ ] **Auto-generated Files** - Automatic generation of routes, utility files, and configurations
+- [ ] **Auto-generated Files** - Automatic generation of routes, utility files, and configurations based on code and pages directories
 - [ ] **Layouts** - Layouts inside sub routes

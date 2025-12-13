@@ -1,231 +1,356 @@
 /**
- * Tagged template literal to create HTML elements.
+ * Tagged template literal to create HTML elements with Vue-like directives.
  *
  * Supported syntax:
- *
+ * 
  * 1. Text interpolation:
  *    html`<span>${value}</span>`
- *
+ * 
  * 2. Attribute interpolation:
  *    html`<div class="${className}" id="${id}"></div>`
- *
+ * 
  * 3. Event bindings (@event):
  *    html`<button @click="${handler}">Click</button>`
- *    html`<input @input="${onInput}" @change="${onChange}">`
- *
+ * 
  * 4. Property/Boolean bindings (:prop):
- *    - Boolean values toggle attribute presence:
- *      html`<button :disabled="${isDisabled}">Send</button>`
- *      html`<div :hidden="${!visible}">Content</div>`
- *    - Other values set the property directly:
- *      html`<input :value="${text}">`
- *      html`<select :selectedIndex="${index}">`
+ *    html`<button :disabled="${isDisabled}">Send</button>`
+ * 
+ * 5. Conditional rendering (v-if, v-else-if, v-else):
+ *    html`<div v-if="${condition}">Show if true</div>`
+ *    html`<div v-else>Show if false</div>`
+ * 
+ * 6. Loop rendering (v-for):
+ *    html`<li v-for="${item => items}">Item: ${item}</li>`
+ * 
+ * 7. Nested templates and arrays:
+ *    html`<div>${items.map(item => html`<li>${item}</li>`)}</div>`
+ */
+
+/**
+ * Main template literal function for creating DOM elements.
+ * Processes directives, text interpolation, attributes, and events.
  *
- * 5. Nested templates:
- *    html`<div>${condition ? html`<span>Yes</span>` : html`<span>No</span>`}</div>`
- *
- * 6. Array rendering:
- *    html`<ul>${items.map(item => html`<li>${item}</li>`)}</ul>`
- *
+ * @param {TemplateStringsArray} strings - The literal strings from the template.
+ * @param  {...any} values - Interpolated values, can be primitives, arrays, or nodes.
+ * @returns {HTMLElement | DocumentFragment} - The rendered DOM node(s).
  */
 export function html(strings, ...values) {
-  // Unique markers to identify interpolated values
+  // Generate unique markers for interpolation positions
   const markers = values.map((_, i) => `__HTML_MARKER_${i}__`);
 
-  // Build the HTML with markers
+  // Combine template strings and markers to form HTML string
   let htmlString = strings[0];
   for (let i = 0; i < values.length; i++) {
     htmlString += markers[i] + strings[i + 1];
   }
 
-  // Create a template to parse the HTML
+  // Create a template element to parse HTML
   const template = document.createElement("template");
   template.innerHTML = htmlString.trim();
 
+  // Clone content to avoid mutating the template
   const fragment = template.content.cloneNode(true);
 
-  // Process the fragment and replace markers
-  processNode(fragment, markers, values);
+  // Process Vue-like directives (v-if, v-else-if, v-else, v-for)
+  processDirectives(fragment, markers, values);
 
-  return fragment.childElementCount === 1
-    ? fragment.firstElementChild
-    : fragment;
+  // Determine single root element or return a fragment
+  const node =
+    fragment.childElementCount === 1
+      ? fragment.firstElementChild
+      : fragment;
+
+  // Process text interpolations, attributes, and event bindings
+  processNode(node, markers, values);
+
+  return node;
 }
 
 /**
- * Process a node and its children to replace markers with actual values
- * @param {HTMLNode} node
- * @param {string[]} markers
- * @param {any[]} values
- * @returns {void}
+ * Recursively processes directives on a node and its children.
+ * Supports v-if, v-else-if, v-else, and v-for.
+ *
+ * @param {Node} node - The DOM node or fragment to process.
+ * @param {string[]} markers - Unique markers for interpolated values.
+ * @param {any[]} values - Interpolated values.
  */
-function processNode(node, markers, values) {
-  // Process text nodes
-  if (node.nodeType === Node.TEXT_NODE) {
-    processTextNode(node, markers, values);
+function processDirectives(node, markers, values) {
+  if (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) return;
+
+  const children = Array.from(node.childNodes);
+
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+
+    if (child.nodeType === Node.ELEMENT_NODE) {
+      if (child.hasAttribute('v-if')) {
+        // skip all processed nodes in the conditional chain
+        i = handleConditionalChain(node, children, i, markers, values);
+        continue;
+      }
+
+      if (child.hasAttribute('v-for')) {
+        handleVFor(child, markers, values);
+        continue;
+      }
+
+      processDirectives(child, markers, values);
+    }
+  }
+}
+
+/**
+ * Processes v-if, v-else-if, and v-else chains.
+ * Keeps the first element whose condition is truthy.
+ *
+ * @param {Node} parent - Parent node of the conditional chain.
+ * @param {Node[]} children - List of child nodes.
+ * @param {number} startIndex - Index where v-if chain starts.
+ * @param {string[]} markers - Unique markers for interpolation.
+ * @param {any[]} values - Interpolated values.
+ * @returns {number} - Updated index after processing chain.
+ */
+function handleConditionalChain(parent, children, startIndex, markers, values) {
+  const chain = [];
+  let currentIndex = startIndex;
+
+  // Collect all conditional elements in the chain
+  while (currentIndex < children.length) {
+    const element = children[currentIndex];
+    if (element.nodeType !== Node.ELEMENT_NODE) {
+      currentIndex++;
+      continue;
+    }
+
+    if (element.hasAttribute('v-if')) {
+      chain.push({ 
+        element, 
+        type: 'if', 
+        condition: element.getAttribute('v-if'),
+      });
+      currentIndex++;
+    } else if (element.hasAttribute('v-else-if')) {
+      if (!chain.length) break;
+      chain.push({ 
+        element, 
+        type: 'else-if', 
+        condition: element.getAttribute('v-else-if'),
+      });
+      currentIndex++;
+    } else if (element.hasAttribute('v-else')) {
+      if (!chain.length) break;
+      chain.push({ 
+        element, 
+        type: 'else', 
+        condition: null,
+      });
+      currentIndex++;
+      break; // v-else must be last
+    } else break;
+  }
+
+  // Evaluate chain and keep only the first truthy element
+  let kept = null;
+  for (const item of chain) {
+    if (kept) {
+      item.element.remove();
+      continue;
+    }
+
+    if (item.type === 'else') {
+      kept = item.element;
+      item.element.removeAttribute('v-else');
+    } else {
+      // todo: fix bug, en template string creo que no esta bien el value
+      const markerIndex = markers.findIndex(m => item.condition.includes(m));
+      const condition = markerIndex !== -1 ? values[markerIndex] : false;
+      if (condition) {
+        kept = item.element;
+        item.element.removeAttribute(item.type === 'if' ? 'v-if' : 'v-else-if');
+      } else {
+        item.element.remove();
+      }
+    }
+  }
+
+  return currentIndex - 1;
+}
+
+/**
+ * Handles v-for directives to render lists.
+ * Clones the template element for each item in the array.
+ *
+ * @param {HTMLElement} element - Template element with v-for attribute.
+ * @param {string[]} markers - Unique markers for interpolation.
+ * @param {any[]} values - Interpolated values (must include array for v-for).
+ */
+function handleVFor(element, markers, values) {
+  const vForValue = element.getAttribute('v-for');
+  const markerIndex = markers.findIndex(m => vForValue.includes(m));
+  if (markerIndex === -1 || !Array.isArray(values[markerIndex])) {
+    element.removeAttribute('v-for');
     return;
   }
 
-  // Process attributes if it's an element
+  const items = values[markerIndex];
+  const parent = element.parentNode;
+  const template = element.cloneNode(true);
+  template.removeAttribute('v-for');
+
+  const fragment = document.createDocumentFragment();
+  for (const item of items) {
+    const clone = template.cloneNode(true);
+    replaceItemReferences(clone, item);
+    fragment.appendChild(clone);
+  }
+
+  parent.replaceChild(fragment, element);
+}
+
+/**
+ * Replaces item references in cloned v-for elements.
+ *
+ * @param {Node} node - Node to replace references in.
+ * @param {Object} item - Current item from the array.
+ */
+function replaceItemReferences(node, item) {
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    for (const attr of Array.from(node.attributes)) {
+      if (attr.value.includes('item.')) {
+        const prop = attr.value.replace('item.', '');
+        node.setAttribute(attr.name, item[prop] ?? '');
+      }
+    }
+  }
+  
+  for (const child of Array.from(node.childNodes)) {
+    replaceItemReferences(child, item)
+  };
+}
+
+/**
+ * Recursively processes nodes, replacing markers with actual values.
+ * Also handles attributes and event listeners.
+ *
+ * @param {Node} node - Node to process.
+ * @param {string[]} markers - Unique markers for interpolation.
+ * @param {any[]} values - Interpolated values.
+ */
+function processNode(node, markers, values) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return processTextNode(node, markers, values)
+  };
   if (node.nodeType === Node.ELEMENT_NODE) {
     processAttributes(node, markers, values);
   }
-
-  // Process children recursively
-  const children = Array.from(node.childNodes);
-  for (const child of children) {
+  for (const child of Array.from(node.childNodes)) {
     processNode(child, markers, values);
   }
 }
 
 /**
- * Process text nodes, replacing markers with values
- * @param {HTMLElement} node
- * @param {string[]} markers
- * @param {any[]} values
- * @return {void}
+ * Processes text nodes by replacing markers with values.
+ * Supports primitives, nodes, and arrays of nodes.
+ *
+ * @param {Text} node - Text node to process.
+ * @param {string[]} markers - Unique markers for interpolation.
+ * @param {any[]} values - Interpolated values.
  */
 function processTextNode(node, markers, values) {
   let text = node.textContent;
-  let hasMarker = false;
 
   for (let i = 0; i < markers.length; i++) {
-    if (text.includes(markers[i])) {
-      hasMarker = true;
-      const value = values[i];
-
-      // If the value is a DocumentFragment or Node, we need to replace the node
-      if (value instanceof Node) {
-        const parts = text.split(markers[i]);
-        const parent = node.parentNode;
-
-        // Create text node before
-        if (parts[0]) {
-          parent.insertBefore(document.createTextNode(parts[0]), node);
-        }
-
-        // if it's a DocumentFragment, move its children
-        if (value instanceof DocumentFragment) {
-          while (value.firstChild) {
-            parent.insertBefore(value.firstChild, node);
-          }
-        } else {
-          parent.insertBefore(value.cloneNode(true), node);
-        }
-
-        // Update remaining text
-        text = parts.slice(1).join(markers[i]);
-        node.textContent = text;
-      }
-      // If it's an array, process each element
-      else if (Array.isArray(value)) {
-        const parts = text.split(markers[i]);
-        const parent = node.parentNode;
-
-        if (parts[0]) {
-          parent.insertBefore(document.createTextNode(parts[0]), node);
-        }
-
-        for (const item of value) {
-          if (item instanceof DocumentFragment) {
-            // ✅ CAMBIO: Mover hijos del fragment (no clonar)
-            while (item.firstChild) {
-              parent.insertBefore(item.firstChild, node);
-            }
-          } else if (item instanceof Node) {
-            parent.insertBefore(item.cloneNode(true), node);
-          } else {
-            parent.insertBefore(
-              document.createTextNode(String(item ?? "")),
-              node
-            );
-          }
-        }
-
-        text = parts.slice(1).join(markers[i]);
-        node.textContent = text;
-      }
-      // Primitive value
-      else {
-        text = text.replace(markers[i], value ?? "");
-      }
+    if (!text.includes(markers[i])) {
+      continue;
     }
+    const value = values[i];
+    const parent = node.parentNode;
+    const parts = text.split(markers[i]);
+
+    if (parts[0]) {
+      parent.insertBefore(document.createTextNode(parts[0]), node);
+    }
+
+    if (Array.isArray(value)) {
+      // Insert arrays of nodes or primitives
+      for (const item of value) {
+        if (item instanceof Node) {
+          processNode(item, markers, values);
+          parent.insertBefore(item, node);
+        } else {
+          parent.insertBefore(document.createTextNode(String(item ?? "")), node);
+        }
+      }
+    } else if (value instanceof Node) {
+      processNode(value, markers, values);
+      parent.insertBefore(value, node);
+    } else {
+      parent.insertBefore(document.createTextNode(String(value ?? "")), node);
+    }
+
+    text = parts.slice(1).join(markers[i]);
   }
 
-  if (hasMarker) {
-    node.textContent = text;
-  }
+  node.textContent = text;
 }
 
 /**
- * Process element attributes, handling special bindings
- * @param {HTMLElement} element
- * @param {string[]} markers
- * @param {any[]} values
- * @returns {void}
+ * Maps special HTML attributes to DOM properties.
+ *
+ * @param {string} attrName - Attribute name from template.
+ * @returns {object|string} - Property name and joinability or original string.
+ */
+function getNodePropertyInfo(attrName) {
+  const nodeProperties = { 
+    class: { property: "className", canBeJoined: true } 
+  };
+  return nodeProperties[attrName] || attrName;
+}
+
+/**
+ * Processes element attributes.
+ * Supports:
+ * - @event bindings: adds native DOM event listeners.
+ * - :prop bindings: sets DOM properties and boolean attributes.
+ *
+ * @param {HTMLElement} element - Element to process.
+ * @param {string[]} markers - Interpolation markers.
+ * @param {any[]} values - Interpolated values.
  */
 function processAttributes(element, markers, values) {
-  const attributesToRemove = [];
-  const attributesToProcess = Array.from(element.attributes);
+  for (const attr of Array.from(element.attributes)) {
+    // Event binding: @event
+    if (attr.name.startsWith("@")) {
+      const event = attr.name.slice(1);
+      const idx = markers.findIndex(m => attr.value.includes(m));
+      const handler = values[idx];
 
-  // for each attribute, check for special bindings
-  for (const attr of attributesToProcess) {
-    const name = attr.name;
-    const value = attr.value;
-
-    // Event binding: @click, @input, etc.
-    if (name.startsWith("@")) {
-      const eventName = name.slice(1);
-      const markerIndex = markers.findIndex((m) => value.includes(m));
-
-      if (markerIndex !== -1) {
-        const handler = values[markerIndex];
-        if (typeof handler === "function") {
-          element.addEventListener(eventName, handler);
-        }
+      if (typeof handler === "function") {
+        element.addEventListener(event, handler);
       }
-      attributesToRemove.push(name);
+
+      element.removeAttribute(attr.name);
+      continue;
     }
 
-    // Property/Boolean binding: :value, :checked, :disabled, etc.
-    else if (name.startsWith(":")) {
-      const propName = name.slice(1);
-      const markerIndex = markers.findIndex((m) => value.includes(m));
+    // Property/boolean binding: :prop
+    if (attr.name.startsWith(":")) {
+      const { property, canBeJoined } = getNodePropertyInfo(attr.name.slice(1));
+      const idx = markers.findIndex((m) => attr.value.includes(m));
 
-      if (markerIndex !== -1) {
-        const propValue = values[markerIndex];
-
-        // If boolean, treat as boolean attribute
-        if (typeof propValue === "boolean") {
-          if (propValue) {
-            element.setAttribute(propName, "");
-          } else {
-            element.removeAttribute(propName);
-          }
+      if (idx !== -1) {
+        const value = values[idx];
+        if (typeof value === "boolean") {
+          element.toggleAttribute(property, value);
         }
-        // Otherwise, set as property
         else {
-          element[propName] = propValue;
+          element[property] = canBeJoined && element[property] 
+            ? `${element[property]} ${value}` 
+            : value;
         }
       }
-      attributesToRemove.push(name);
-    }
-    // Regular attribute with interpolated value
-    else {
-      let newValue = value;
-      for (let i = 0; i < markers.length; i++) {
-        if (newValue.includes(markers[i])) {
-          newValue = newValue.replace(markers[i], values[i] ?? "");
-        }
-      }
-      if (newValue !== value) {
-        element.setAttribute(name, newValue);
-      }
-    }
-  }
 
-  // remove processed special attributes
-  for (const name of attributesToRemove) {
-    element.removeAttribute(name);
+      element.removeAttribute(attr.name);
+    }
   }
 }

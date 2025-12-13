@@ -94,7 +94,7 @@ async function renderClientComponents(html, clientComponents) {
   const allMatches = [];
   const allScripts = [];
 
-  for (const [componentName, componentData] of clientComponents.entries()) {
+  for (const componentName of clientComponents.keys()) {
     const escapedName = componentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const componentRegex = new RegExp(
       `<${escapedName}(?![a-zA-Z0-9_-])\\s*([^>]*?)\\s*(?:\\/>|>\\s*<\\/${escapedName}(?![a-zA-Z0-9_-])>)`,
@@ -205,11 +205,23 @@ export async function renderComponents({
   serverComponents = new Map(),
   clientComponents = new Map(),
 }) {
-  const { html: htmlServerComponents, suspenseComponents } =
-    await renderServerComponents(html, serverComponents);
+  const hasServerComponents = serverComponents.size > 0;
+  const hasClientComponents = clientComponents.size > 0;
+  
+  const { html: htmlServerComponents,  suspenseComponents } = hasServerComponents ? 
+    await renderServerComponents(html, serverComponents) : 
+    { 
+      html, 
+      suspenseComponents: [],
+    };
 
-  const { html: htmlClientComponents, allScripts: clientComponentsScripts } =
-    await renderClientComponents(htmlServerComponents, clientComponents);
+  const { html: htmlClientComponents, allScripts: clientComponentsScripts } = 
+    hasClientComponents ?
+      await renderClientComponents(htmlServerComponents, clientComponents) :
+      { 
+        html: htmlServerComponents, 
+        allScripts: [],
+      };
 
   return {
     html: htmlClientComponents,

@@ -2,6 +2,8 @@ import fs from "fs/promises";
 import path from "path";
 import { pathToFileURL, fileURLToPath } from "url";
 import { compileTemplateToHTML } from "./template.js";
+import { getComponentNameFromPath, readDirectoryRecursive } from "./files.js";
+import { renderComponents } from "./streaming.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -93,6 +95,11 @@ const getScriptImports = async (script, isClientSide = false) => {
  *   metadata: object,
  *   template: string,
  *   clientCode: string,
+ *   clientImports: [{
+ *      fileUrl: string,
+ *      originalPath: string,
+ *      importStatement: string
+ *    }],
  *   serverComponents: Map<string, { path: string, originalPath: string, importStatement: string }>,
  *   clientComponents: Map<string, { path: string, originalPath: string, importStatement: string }>,
  * }>}
@@ -108,6 +115,7 @@ export async function processHtmlFile(filePath) {
   const clientCode = clientMatch ? clientMatch[1].trim() : "";
   let serverComponents = new Map();
   let clientComponents = new Map();
+  let clientImports = {};
 
   let getData = null;
   let metadata = {};
@@ -154,8 +162,9 @@ export async function processHtmlFile(filePath) {
   }
 
   if (clientMatch) {
-    const { componentRegistry } = await getScriptImports(clientMatch[1], true);
+    const { componentRegistry, clientImports: newClientImports } = await getScriptImports(clientMatch[1], true);
     clientComponents = componentRegistry;
+    clientImports = newClientImports;
   }
 
   return {
@@ -165,6 +174,7 @@ export async function processHtmlFile(filePath) {
     clientCode,
     serverComponents,
     clientComponents,
+    clientImports,
   };
 }
 
@@ -196,21 +206,39 @@ export async function renderHtmlFile(filePath, data = null) {
   return { html, metadata, clientCode, serverComponents, clientComponents };
 }
 
+
 /**
- * Converts template syntax to html`` tagged template syntax
- * Client has access to html function that knows how to render the return value.
- * @param {string} template
- * @param {string} clientCode - Client code to detect reactive variables
- * @returns {string} Converted template
+ * Converts a Vue-like template into an html string to use in client with html service function 
+ * (uses tagged template literal).
+ * 
+ * This function transforms a template using Vue directives (`v-for`, `v-if`, `v-else-if`, `v-else`, `v-show`),
+ * property bindings (`:prop="value"`), interpolations (`{{variable}}`), and events (`@click="handler"`)
+ * into a template literal that can be rendered by the client's `html` function.
+ * 
+ * It also detects reactive variables declared in the client code using `reactive` or `computed`
+ * and automatically appends `.value` when they are used in the template.
+ * 
+ * Supported syntax:
+ * - `v-for="item in items"` → `${items.value.map(item => html`<tag>...</tag>`)}`  
+ * - `v-if="condition"` → `${condition.value ? html`<tag>...</tag>` : ''}`  
+ * - `v-else-if="condition"` → `${condition.value ? html`<tag>...</tag>` : ...}`  
+ * - `v-else` → `${html`<tag>...</tag>`}`  
+ * - `v-show="condition"` → `:hidden="${!condition.value}"`  
+ * - Interpolations `{{variable}}` → `${variable.value}`  
+ * - Property bindings `:prop="value"` → `:prop="${value.value}"`  
+ * - Event bindings `@click="handler"` → `@click="${handler}"` or `@click="${() => handler()}"` if it is a function call  
+ * 
+ * @param {string} template - The input template with Vue-like syntax
+ * @param {string} [clientCode=""] - Client-side code to detect reactive variables
+ * @returns {string} Template converted to `html`` ` tagged template syntax
  */
 function convertVueToHtmlTagged(template, clientCode = "") {
-  // Extract reactive variables from client code (only those created with ractive modules)
   const reactiveVars = new Set();
   const reactiveRegex =
     /(?:const|let|var)\s+(\w+)\s*=\s*(?:reactive|computed)\(/g;
 
   let match;
-
+  
   while ((match = reactiveRegex.exec(clientCode)) !== null) {
     reactiveVars.add(match[1]);
   }
@@ -226,17 +254,17 @@ function convertVueToHtmlTagged(template, clientCode = "") {
     });
   };
 
-  let result = template;
+  let result = template.trim();
 
   // v-for="item in items" → ${items.value.map(item => html`...`)}
   result = result.replace(
-    /<(\w+)([^>]*)\s+v-for="(\w+)\s+in\s+(\w+)(?:\.value)?"([^>]*)>([\s\S]*?)<\/\1>/g,
+    /<(\w+)([^>]*)\s+v-for="(\w+)\s+in\s+([^"]+)(?:\.value)?"([^>]*)>([\s\S]*?)<\/\1>/g,
     (_, tag, beforeAttrs, iterVar, arrayVar, afterAttrs, content) => {
-      // Add .value if it's a reactive variable
-      const arrayAccess = reactiveVars.has(arrayVar)
-        ? `${arrayVar}.value`
-        : arrayVar;
-
+      const cleanExpr = arrayVar.trim();
+      const isSimpleVar = /^\w+$/.test(cleanExpr);
+      const arrayAccess = isSimpleVar && reactiveVars.has(cleanExpr)
+        ? `${cleanExpr}.value`
+        : cleanExpr;
       return `\${${arrayAccess}.map(${iterVar} => html\`<${tag}${beforeAttrs}${afterAttrs}>${content}</${tag}>\`)}`;
     }
   );
@@ -252,32 +280,59 @@ function convertVueToHtmlTagged(template, clientCode = "") {
   });
 
   // @click="handler" → @click="${handler}" (no .value for functions)
-  result = result.replace(/@(\w+)="([^"]+)"/g, '@$1="${$2}"');
+  result = result.replace(/@(\w+)="([^"]+)"/g, (_, event, handler) => {
+    const isArrowFunction = /^\s*\(?.*?\)?\s*=>/.test(handler);
+    const isFunctionCall = /[\w$]+\s*\(.*\)/.test(handler.trim());
+
+    if (isArrowFunction) {
+      return `@${event}="\${${handler.trim()}}"`;
+    } else if (isFunctionCall) {
+      return `@${event}="\${() => ${handler.trim()}}"`;
+    } else {
+      return `@${event}="\${${handler.trim()}}"`;
+    }
+  });
 
   // :prop="value" → :prop="${value.value}" (for reactive vars, but skip already processed ${...})
   result = result.replace(/:(\w+)="(?!\$\{)([^"]+)"/g, (_, attr, value) => {
     return `:${attr}="\${${processExpression(value)}}"`;
   });
 
+  // v-if="condition" → v-if="${condition}"
+  result = result.replace(/v-if="([^"]*)"/g, 'v-if="${$1}"');
+
+  // v-else-if="condition" → v-else-if="${condition}"
+  result = result.replace(/v-else-if="([^"]*)"/g, 'v-else-if="${$1}"');
+  
   return result;
 }
 
+
 /**
  * Return array of imports, ensuring required imports are in client code.
- * @param {string} clientCode
+ *  @param {[{
+ *    fileUrl: string,
+ *    originalPath: string,
+ *    importStatement: string
+ * }]} clientImports,
+ * @param {Map<string, { 
+ *  path: string, 
+ *  originalPath: string, 
+ *  importStatement: string,
+ * }>} clientComponents,
  * @param {{
  *  [modulePath: string]: string[]
  * }} requiredImports - Map of module path: required modules
  * @returns {Promise<string[]>}
  */
 async function getClientCodeImports(
-  clientCode,
+  clientImports,
+  clientComponents,
   requiredImports = {
     "/public/app/services/reactive.js": ["effect"],
     "/public/app/services/html.js": ["html"],
   }
 ) {
-  const { clientImports } = await getScriptImports(clientCode, true);
 
   // Create a unique set of import statements to avoid duplicates
   const cleanImportsSet = new Set(
@@ -322,6 +377,16 @@ async function getClientCodeImports(
     }
   }
 
+  // Ensure client components are imported
+  // for (const { originalPath, importStatement } of clientComponents.values()) {
+  //   const importExists = cleanImports.some((imp) =>
+  //     new RegExp(`from\\s+['"]${originalPath}['"]`).test(imp)
+  //   );
+  //   if (!importExists) {
+  //     cleanImports.push(importStatement);
+  //   }
+  // }
+
   // Return the final list of import statements
   return cleanImports;
 }
@@ -332,7 +397,7 @@ async function getClientCodeImports(
  * @returns {Promise<string>}
  */
 export async function generateClientComponentModule(componentPath) {
-  const { clientCode, template } = await processHtmlFile(componentPath);
+  const { clientCode, template, clientComponents,  clientImports } = await processHtmlFile(componentPath);
 
   // Extract default props from vprops
   const defaults = extractVPropsDefaults(clientCode);
@@ -346,12 +411,11 @@ export async function generateClientComponentModule(componentPath) {
     .trim();
 
   // Convert template
-  const convertedTemplate = convertVueToHtmlTagged(
-    template,
-    clientCodeWithProps
-  );
+  const convertedTemplate = convertVueToHtmlTagged(template, clientCodeWithProps);
 
-  const cleanImports = await getClientCodeImports(clientCode);
+  const { html: processedHtml  } = await renderComponents({ html: convertedTemplate, clientComponents});
+
+  const cleanImports = await getClientCodeImports(clientImports, clientComponents);
 
   const clientComponentModule = `
     ${cleanImports.join("\n")}  
@@ -361,7 +425,7 @@ export async function generateClientComponentModule(componentPath) {
       
       let root = null;
       function render() {
-        const node = html\`${convertedTemplate}\`;
+        const node = html\`${processedHtml}\`;
         if (!root) {
           root = node;
           marker.replaceWith(node);
@@ -496,25 +560,27 @@ function addComputedProps(clientCode, componentProps) {
  */
 export async function generateAllClientComponents() {
   const componentsDir = path.resolve(rootPath, "server", "components");
+  const pagesDir = path.resolve(rootPath, "pages");
   const outputDir = path.resolve(rootPath, "public", "components");
 
   // Ensure output directory exists
   await fs.mkdir(outputDir, { recursive: true });
 
-  // Read all .html files in components directory
-  const files = await fs.readdir(componentsDir);
-  const htmlFiles = files.filter((file) => file.endsWith(".html"));
+  // Read all .html files in components and pages directory, go deep 
+  const pageFiles = await readDirectoryRecursive(pagesDir);
+  const componentFiles = await readDirectoryRecursive(componentsDir);
+  
+
+  const htmlFiles = [...pageFiles, ...componentFiles].filter((file) => file.fullpath.endsWith(".html"));
 
   for (const file of htmlFiles) {
-    const componentPath = path.join(componentsDir, file);
-    const componentName = path.basename(file, ".html");
-
-    // Check if component has client code
-    const { clientCode } = await processHtmlFile(componentPath);
-    if (!clientCode) continue;
 
     // Generate JS module
-    const moduleCode = await generateClientComponentModule(componentPath);
+    const moduleCode = await generateClientComponentModule(file.fullpath);
+
+    if(!moduleCode) continue;
+    
+    const componentName = getComponentNameFromPath(file.fullpath, file.name)
 
     // Write to public/components/
     const outputPath = path.join(outputDir, `${componentName}.js`);

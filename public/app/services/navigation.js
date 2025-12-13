@@ -1,4 +1,4 @@
-import { ClientSidePage } from "../../components/csr-page.js";
+import { hydrateClientComponent } from "../../components/page-csr.js";
 
 // Notes: In future, we can add this routes automatically when we build the project, getting the info from pages directory
 export const routes = [
@@ -11,7 +11,7 @@ export const routes = [
   },
   {
     path: "/page-csr",
-    component: ClientSidePage,
+    component: hydrateClientComponent,
     meta: {
       ssr: false,
       requiresAuth: false,
@@ -97,6 +97,16 @@ function initializeRouter() {
 
   navigate(location.pathname, false);
 }
+function addHydrateClientComponentScript() {
+  // check if script already exists
+  if (document.querySelector('script[src="/public/app/services/hydrate-client-components.js"]')) {
+    return;
+  }
+
+  const hydrateScript = document.createElement("script");
+  hydrateScript.src = "/public/app/services/hydrate-client-components.js";
+  document.head.appendChild(hydrateScript);
+}
 
 function renderPage(route, path) {
   const main = document.querySelector("main");
@@ -112,10 +122,15 @@ function renderPage(route, path) {
     params = match ? match.slice(1) : [];
   }
 
-  const pageElement = new route.component(...params);
-
+  // create template marker
   main.innerHTML = "";
-  main.appendChild(pageElement);
+  const marker = document.createElement("template");
+  main.appendChild(marker);
+
+  // render component into marker
+  route.component(marker);
+
+  addHydrateClientComponentScript();
 }
 
 function navigate(path, addToHistory = true) {
