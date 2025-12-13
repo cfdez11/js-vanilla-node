@@ -49,35 +49,47 @@ const getLayoutTemplate = async () => {
 
 /**
  * Generates client script tag
- * @param {string} clientCode
- * @param {Array<string>} componentScripts
- * @param {
+ * @param {{
+ * clientCode: string,
+ * clientComponentsScripts: Array<string>,
+ * clientComponents: 
  *  Map<string, {
  *    path: string,
  *    originalPath: string,
  *    importStatement: string
- *  }>} clientComponents
+ *  }>
+ * addHydrateClientComponentsScript: boolean,
+ * }} params
  * @returns {string}
  */
-function generateClientScriptTags(
+function generateClientScriptTags({
   clientCode,
-  componentScripts = [],
-  clientComponents = new Map()
-) {
+  clientComponentsScripts = [],
+  clientComponents = new Map(),
+  addHydrateClientComponentsScript = false, 
+}) {
   if (!clientCode) return "";
   // replace component imports to point to .js files
   for (const { importStatement } of clientComponents.values()) {
-    clientCode = clientCode.replace(importStatement, "");
+    clientCode = clientCode.replace(`${importStatement};`, '').replace(importStatement, "");
   }
 
   const clientCodeWithoutComponentImports = clientCode
     .split("\n")
     .filter((line) => !/^\s*import\s+.*['"].*\.html['"]/.test(line))
-    .join("\n");
+    .join("\n")
+    .trim();
 
   const scripts = `
-    <script src="/public/app/services/hydrate-client-components.js"></script>
-    <script type="module">\n${clientCodeWithoutComponentImports}\n</script>\n${componentScripts}
+    ${addHydrateClientComponentsScript 
+      ? `<script src="/public/app/services/hydrate-client-components.js"></script>` 
+      : ""
+    }
+    ${clientCodeWithoutComponentImports.trim() 
+      ? `<script type="module">\n${clientCodeWithoutComponentImports}\n</script>`
+      : ""
+    }
+    ${clientComponentsScripts?.length ? clientComponentsScripts.join("\n") : ""}
   `;
 
   return scripts.trim();
@@ -121,11 +133,12 @@ async function renderPageWithLayout(pagePath, data = null) {
   });
 
   // Wrap in layout
-  const clientScripts = generateClientScriptTags(
+  const clientScripts = generateClientScriptTags({
     clientCode,
-    clientComponentsScripts.join("\n"),
-    clientComponents
-  );
+    clientComponentsScripts,
+    clientComponents,
+    addHydrateClientComponentsScript: suspenseComponents.length > 0,
+  });
 
   const layoutTemplate = await getLayoutTemplate();
   const fullHtml = compileTemplateToHTML(layoutTemplate, {
@@ -209,7 +222,7 @@ async function renderAndSendPage(
  * Handles incoming page request
  * @param {import("http").IncomingMessage} req
  * @param {import("http").ServerResponse} res
- * @param {{path: string, meta: object}} route
+ * @param {{ path: string, meta: object}} route
  */
 export async function handlePageRequest(req, res, route) {
   if (!route) {

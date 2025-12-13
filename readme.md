@@ -295,13 +295,60 @@ pnpm format       # Format code with Biome
 ## 🏗️ Rendering Flow
 
 ### SSR (Server-Side Rendering)
+```mermaid
+---
+config:
+  theme: mc
+---
+sequenceDiagram
+        autonumber
+        participant Client
+        participant Server
+        participant Router
+        participant ComponentProcessor
+        participant Streaming
+        participant Template
 
-1. Request → Server
-2. Executes `<script server>` and `getData()`
-3. Renders server components (`s-*`)
-4. Inserts into layout with metadata
-5. Sends complete HTML to browser
-6. Hydrates client components (`c-*`)
+        Client ->> Server: request page /blog
+        Note over Client,Server: Request SSR
+        Server ->> Router: handlePageRequest(req, res, route) 
+        Router ->> ComponentProcessor: renderHtmlFile(filePath, data)
+        ComponentProcessor ->> ComponentProcessor: processHtmlFile(filePath)
+        Note over ComponentProcessor: getData, metatada, <br />template, clientCode, <br />sComponentsMap, cComponentsMap
+        ComponentProcessor ->> ComponentProcessor: getData(data)
+        Note over ComponentProcessor: SSR fetch data
+        ComponentProcessor ->> Template: compileTemplateToHTML(template, data)
+        Template ->> Template: processNodes
+        Note over Template: Html dom tree (htmlparser2)
+        Template ->> ComponentProcessor: html
+        ComponentProcessor ->> Router: html, metada, clientCode, scomponentsMap, ccomponentsMap
+        Router ->> Streaming: renderComponents(html, sComponentsMap, cComponentsMap)
+        Streaming ->> Streaming: renderServerComponents(html, sComponentsMap)
+        Note over Streaming: html and suspenseComponents
+        Streaming ->> Streaming: renderClientComponents(html, cComponentsMap)
+        Note over Streaming: html and clientComponentsScripts <br/> html replaced ccomponents by templates <br/> to be hydrated on client
+        Streaming ->> Router: html, suspenseComponents, clientComponentsScripts
+        Router --> Router: generateClientScriptTags(clientCode, componentScripts, cComponents)
+        Note over Streaming: scripts that need the page
+        Router ->> Router: compileTemplateToHtml(layoutTemplate, { clientScripts, metatada, children: html })
+        Note over Streaming: html with root layout
+        alt no suspense components
+            Router ->> Client: sendResponse(res, statusCode, html)
+        else suspense components
+            Router ->> Client: res.write(no_closed_html)
+            loop suspense components
+              Router ->> Streaming: renderSuspenseComponent(suspenseComponent, sComponentsMap)
+              Streaming ->> Streaming: processServerComponents(html, serverComponents)
+              Note over Streaming: scomponent html
+              Streaming ->> Router: html
+              Router ->> Streaming: generateReplacementContent(suspenseComponentId, html)
+              Streaming ->> Router: scomponent html in template with id to be replaced on client
+              Router ->> Client: res.write(template_suspense_component_html)
+            end
+            Router ->> Client: res.end(closed_html)
+        end
+```
+
 
 ### CSR (Client-Side Rendering)
 

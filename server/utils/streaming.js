@@ -71,15 +71,6 @@ async function processServerComponents(html, serverComponents) {
   return processedHtml;
 }
 
-const cleanClientComponentPath = (path) => {
-  const normalized = path.replace(/\\/g, "/");
-  const idx = normalized.indexOf("/public");
-
-  if (idx === -1) return normalized;
-
-  return normalized.substring(idx);
-};
-
 /**
  * Renders components in HTML and client scripts to load them
  * @param {string} html
@@ -239,7 +230,7 @@ export async function renderComponents({
  */
 export function generateReplacementContent(suspenseId, renderedContent) {
   const contentId = `${suspenseId}-content`;
-  return `<template id="${contentId}">${renderedContent}</template><script src="/public/app/services/hydrate.js" data-target="${suspenseId}" data-source="${contentId}" defer></script>`;
+  return `<template id="${contentId}">${renderedContent}</template><script src="/public/app/services/hydrate.js" data-target="${suspenseId}" data-source="${contentId}" async></script>`;
 }
 
 /**

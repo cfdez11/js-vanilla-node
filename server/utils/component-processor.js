@@ -327,7 +327,6 @@ function convertVueToHtmlTagged(template, clientCode = "") {
  */
 async function getClientCodeImports(
   clientImports,
-  clientComponents,
   requiredImports = {
     "/public/app/services/reactive.js": ["effect"],
     "/public/app/services/html.js": ["html"],
@@ -377,16 +376,6 @@ async function getClientCodeImports(
     }
   }
 
-  // Ensure client components are imported
-  // for (const { originalPath, importStatement } of clientComponents.values()) {
-  //   const importExists = cleanImports.some((imp) =>
-  //     new RegExp(`from\\s+['"]${originalPath}['"]`).test(imp)
-  //   );
-  //   if (!importExists) {
-  //     cleanImports.push(importStatement);
-  //   }
-  // }
-
   // Return the final list of import statements
   return cleanImports;
 }
@@ -415,7 +404,7 @@ export async function generateClientComponentModule(componentPath) {
 
   const { html: processedHtml  } = await renderComponents({ html: convertedTemplate, clientComponents});
 
-  const cleanImports = await getClientCodeImports(clientImports, clientComponents);
+  const cleanImports = await getClientCodeImports(clientImports);
 
   const clientComponentModule = `
     ${cleanImports.join("\n")}  
