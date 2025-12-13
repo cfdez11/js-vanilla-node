@@ -328,8 +328,8 @@ function convertVueToHtmlTagged(template, clientCode = "") {
 async function getClientCodeImports(
   clientImports,
   requiredImports = {
-    "/public/app/services/reactive.js": ["effect"],
-    "/public/app/services/html.js": ["html"],
+    "/public/_app/services/reactive.js": ["effect"],
+    "/public/_app/services/html.js": ["html"],
   }
 ) {
 
@@ -386,7 +386,7 @@ async function getClientCodeImports(
  * @returns {Promise<string>}
  */
 export async function generateClientComponentModule(componentPath) {
-  const { clientCode, template, clientComponents,  clientImports } = await processHtmlFile(componentPath);
+  const { clientCode, template, clientComponents,  clientImports, metadata } = await processHtmlFile(componentPath);
 
   // Extract default props from vprops
   const defaults = extractVPropsDefaults(clientCode);
@@ -409,6 +409,8 @@ export async function generateClientComponentModule(componentPath) {
   const clientComponentModule = `
     ${cleanImports.join("\n")}  
 
+    export const metadata = ${JSON.stringify(metadata || {})}
+    
     export function hydrateClientComponent(marker) {
       ${cleanClientCode}
       
@@ -550,7 +552,7 @@ function addComputedProps(clientCode, componentProps) {
 export async function generateAllClientComponents() {
   const componentsDir = path.resolve(rootPath, "server", "components");
   const pagesDir = path.resolve(rootPath, "pages");
-  const outputDir = path.resolve(rootPath, "public", "components");
+  const outputDir = path.resolve(rootPath, "public", "_app", "components");
 
   // Ensure output directory exists
   await fs.mkdir(outputDir, { recursive: true });

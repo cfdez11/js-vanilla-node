@@ -1,4 +1,4 @@
-import { hydrateClientComponent } from "../../components/page-csr.js";
+import * as pageCSR from "../components/page-csr.js";
 
 // Notes: In future, we can add this routes automatically when we build the project, getting the info from pages directory
 export const routes = [
@@ -11,7 +11,8 @@ export const routes = [
   },
   {
     path: "/page-csr",
-    component: hydrateClientComponent,
+    component: pageCSR.hydrateClientComponent,
+    metadata: pageCSR.metadata,
     meta: {
       ssr: false,
       requiresAuth: false,
@@ -97,17 +98,45 @@ function initializeRouter() {
 
   navigate(location.pathname, false);
 }
+
+/**
+ * Adds hydrate-client-components script to the document head
+ * @returns {void}
+ */
 function addHydrateClientComponentScript() {
-  // check if script already exists
-  if (document.querySelector('script[src="/public/app/services/hydrate-client-components.js"]')) {
+  if (document.querySelector('script[src="/public/_app/services/hydrate-client-components.js"]')) {
     return;
   }
 
   const hydrateScript = document.createElement("script");
-  hydrateScript.src = "/public/app/services/hydrate-client-components.js";
+  hydrateScript.src = "/public/_app/services/hydrate-client-components.js";
   document.head.appendChild(hydrateScript);
 }
 
+const addMetadata = (metadata) => {
+  if (metadata.title) {
+    document.title = metadata.title;
+  }
+  if (metadata.description) {
+    let descriptionMeta = document.querySelector('meta[name="description"]');
+    if (!descriptionMeta) {
+      descriptionMeta = document.createElement("meta");
+      descriptionMeta.name = "description";
+      document.head.appendChild(descriptionMeta);
+    }
+    descriptionMeta.content = metadata.description;
+  }
+}
+
+/**
+ * 
+ * @param {{
+ * path: string,
+ * meta: { ssr: boolean, requiresAuth: false }
+ * }} route 
+ * @param {string} path 
+ * @returns {void}
+ */
 function renderPage(route, path) {
   const main = document.querySelector("main");
 
@@ -130,9 +159,19 @@ function renderPage(route, path) {
   // render component into marker
   route.component(marker);
 
+  if (route.metadata) {
+    addMetadata(route.metadata);
+  }
+
   addHydrateClientComponentScript();
 }
 
+/**
+ * Redirect user a new page page by path, with optional history addition
+ * @param {string} path 
+ * @param {boolean} addToHistory 
+ * @returns {void}
+ */
 function navigate(path, addToHistory = true) {
   const routePath = path.split("?")[0];
   const route = findRoute(routePath);

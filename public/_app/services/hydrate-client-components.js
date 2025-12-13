@@ -5,7 +5,7 @@ async function hydrateMarker(marker) {
   const componentName = marker.getAttribute("data-client:component");
 
   try {
-    const module = await import(`/public/components/${componentName}.js`);
+    const module = await import(`/public/_app/components/${componentName}.js`);
     module.hydrateClientComponent(marker);
     marker.dataset.hydrated = "true";
   } catch (error) {

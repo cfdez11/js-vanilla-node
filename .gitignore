@@ -57,4 +57,4 @@ Thumbs.db
 *.temp
 
 # auto-generated files
-public/components/*.js
+public/_app/components/*.js

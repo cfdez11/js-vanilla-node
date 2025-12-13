@@ -230,7 +230,7 @@ export async function renderComponents({
  */
 export function generateReplacementContent(suspenseId, renderedContent) {
   const contentId = `${suspenseId}-content`;
-  return `<template id="${contentId}">${renderedContent}</template><script src="/public/app/services/hydrate.js" data-target="${suspenseId}" data-source="${contentId}" async></script>`;
+  return `<template id="${contentId}">${renderedContent}</template><script src="/public/_app/services/hydrate.js" data-target="${suspenseId}" data-source="${contentId}" async></script>`;
 }
 
 /**

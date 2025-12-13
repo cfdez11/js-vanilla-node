@@ -17,5 +17,5 @@
   }
 
   // Clean up the script tag itself
-  // script.remove();
+  script.remove();
 })();

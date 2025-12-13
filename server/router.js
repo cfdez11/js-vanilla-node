@@ -82,7 +82,7 @@ function generateClientScriptTags({
 
   const scripts = `
     ${addHydrateClientComponentsScript 
-      ? `<script src="/public/app/services/hydrate-client-components.js"></script>` 
+      ? `<script src="/public/_app/services/hydrate-client-components.js"></script>` 
       : ""
     }
     ${clientCodeWithoutComponentImports.trim() 
