@@ -25,7 +25,7 @@ import { html } from '/public/_app/services/html.js';
         </p>
       </div>
     </header>
-    <template id="client-Weather-1765708514066" data-client:component="_server-components-weather"></template>
+    <template id="client-Weather-1765730667351" data-client:component="_server-components-weather"></template>
   </div>`;
         if (!root) {
           root = node;

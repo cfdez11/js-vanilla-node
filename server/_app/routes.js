@@ -30,6 +30,7 @@ export const routes = [
     meta: {
       ssr: true,
       requiresAuth: false,
+      revalidateSeconds: 60,
     },
   },
   {

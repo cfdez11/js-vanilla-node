@@ -376,3 +376,5 @@ Future features planned for implementation:
 - [ ] **Authentication** - Built-in authentication system with middleware support
 - [ ] **Auto-generated Files** - Automatic generation of routes, utility files, and configurations based on code and pages directories
 - [ ] **Layouts** - Layouts inside sub routes
+- [ ] **Regeneration in background** - Regenerate page after send response (locks)
+- [ ] **Cache with CDN** 

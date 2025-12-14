@@ -9,6 +9,7 @@ import {
   generateReplacementContent,
 } from "./utils/streaming.js";
 import { errorRoute, notFoundRoute } from "./_app/routes.js";
+import { getCachedComponentHtml, setCachedComponentHtml } from "./utils/cache.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PAGES_DIR = path.resolve(__dirname, "..", "pages");
@@ -107,6 +108,40 @@ const sendResponse = (res, statusCode, html) => {
 };
 
 /**
+ * Start stream response, sending html and update html chunks
+ * @param {import("http").ServerResponse} res
+ * @param {string[]} htmlChunks
+ */
+const sendStartStreamChunkResponse = (res, statusCode, html, htmlChunks) => {
+  res.writeHead(statusCode, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Transfer-Encoding": "chunked",
+    "X-Content-Type-Options": "nosniff",
+  });
+  sendStreamChunkResponse(res, html, htmlChunks)
+};
+
+/**
+ * Send html and update html chunks
+ * @param {import("http").ServerResponse} res
+ * @param {string[]} htmlChunks
+ */
+const sendStreamChunkResponse = (res, html, htmlChunks) => {
+  res.write(html);
+  htmlChunks.push(html);
+}
+
+/**
+ * Close html and end response
+ * @param {import("http").ServerResponse} res
+ * @param {string[]} htmlChunks
+ */
+const endStreamResponse = (res, htmlChunks) => {
+  res.write("</body></html>");
+  res.end();
+  htmlChunks.push("</body></html>")
+}
+/**
  * Renders a page with layout and streaming support
  * @param {string} pagePath - Full path to page.html
  * @param {{
@@ -162,38 +197,63 @@ async function renderPageWithLayout(pagePath, ctx) {
 /**
  * Renders and sends a page with streaming
  * @param {{
- *  res: import("http").ServerResponse,
  *  pageName: string,
  *  statusCode?: number,
- *  context?: { [key: string]: any, req: import("http").IncomingMessage, res: import("http").ServerResponse }
+ *  context: { [key: string]: any, req: import("http").IncomingMessage, res: import("http").ServerResponse }
+ *  route: { 
+ *    path: string,
+ *    serverPath: string,
+ *    meta: {
+ *      ssr: boolean,
+ *      requiresAuth: false,
+ *      revalidateSeconds: 60, 
+ *    }
+ * }
  * }}
  */
 async function renderAndSendPage({
-  res,
   pageName,
   statusCode = 200,
-  context = {}
+  context = {},
+  route,
 }) {
   const pagePath = getPagePath(pageName);
+  const revalidateSeconds = route.meta?.revalidateSeconds ?? 0;
+  const isISR = revalidateSeconds > 0;
+
+  if(isISR) {
+    const { html: cachedHtml, isStale } = getCachedComponentHtml({ 
+      componentPath: context.req.url, 
+      revalidateSeconds: route.meta.revalidateSeconds,
+    });
+
+    if(cachedHtml && !isStale) {
+      sendResponse(context.res, statusCode, cachedHtml);
+      return;
+    }
+  }
+  
   const { html, suspenseComponents, serverComponents } =
     await renderPageWithLayout(pagePath, context);
 
   // if no suspense components, send immediately
   if (suspenseComponents.length === 0) {
-    sendResponse(res, statusCode, html);
+    sendResponse(context.res, statusCode, html);
+    if(isISR) {
+      setCachedComponentHtml({ componentPath: context.req.url, html });
+    }
     return;
   }
 
-  // Enable streaming
-  res.writeHead(statusCode, {
-    "Content-Type": "text/html; charset=utf-8",
-    "Transfer-Encoding": "chunked",
-    "X-Content-Type-Options": "nosniff",
-  });
+  const htmlChunks = [];
+  let abortedStream = false;
+  let errorStream = false
+
+  res.on("close", () => abortedStream = true);
 
   // Send initial HTML (before </body>)
   const [beforeClosing] = html.split("</body>");
-  res.write(beforeClosing);
+  sendStartStreamChunkResponse(context.res, beforeClosing, htmlChunks)
 
   // Stream suspense components
   const renderPromises = suspenseComponents.map(async (suspenseComponent) => {
@@ -207,7 +267,7 @@ async function renderAndSendPage({
         suspenseComponent.id,
         renderedContent
       );
-      res.write(replacementContent);
+      sendStreamChunkResponse(context.res, replacementContent, htmlChunks)
     } catch (error) {
       console.error(`Error rendering suspense ${suspenseComponent.id}:`, error);
       const errorContent = generateReplacementContent(
@@ -215,13 +275,19 @@ async function renderAndSendPage({
         `<div class="text-red-500">Error loading content</div>`
       );
       res.write(errorContent);
+      errorStream = true;
     }
   });
 
   await Promise.all(renderPromises);
 
-  res.write("</body></html>");
-  res.end();
+  endStreamResponse(context.res, htmlChunks);
+  if(isISR && !abortedStream && !errorStream) {
+    setCachedComponentHtml({
+      componentPath: pagePath,
+      html: htmlChunks.join("")
+    });
+  }
 }
 
 /**
@@ -244,7 +310,7 @@ export async function handlePageRequest(req, res, route) {
   const context = { req, res };
 
   try {
-    await renderAndSendPage({ res, pageName, context });
+    await renderAndSendPage({ pageName, context, route });
   } catch (e) {
     const errorData = {
       message: e.message || "Internal server error",
@@ -255,7 +321,15 @@ export async function handlePageRequest(req, res, route) {
     };
 
     try {
-      await renderAndSendPage({ res, pageName: "error", statusCode: 500, context: { ...context, ...errorData } });
+      await renderAndSendPage({ 
+        pageName: "error", 
+        statusCode: 500, 
+        context: { 
+          ...context, 
+          ...errorData,
+        }, 
+        route,
+      });
     } catch (err) {
       console.error(`Failed to render error page: ${err.message}`);
       sendResponse(res, 500, FALLBACK_ERROR_HTML);

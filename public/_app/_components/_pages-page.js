@@ -55,7 +55,7 @@ import { html } from '/public/_app/services/html.js';
         <p class="text-gray-700 mb-4">This component is hydrated on the client side and provides full interactivity with
           reactive state:</p>
         <div class="bg-green-50 p-4 rounded flex justify-center">
-          <template id="client-Counter-1765708514069" data-client:component="_server-components-counter"></template>
+          <template id="client-Counter-1765730667354" data-client:component="_server-components-counter"></template>
         </div>
       </section>
 
