@@ -1,17 +1,19 @@
 <script server>
   import { delay } from "server/utils/delay.js";
 
-  async function getData() {
+  async function getData({ req }) {
+    const cityName = req.params.city?.toLowerCase() || "madrid";
+
     const cities = {
-      Madrid: { lat: 40.4168, lon: -3.7038, timezone: "Europe/Madrid" },
-      Barcelona: { lat: 41.3851, lon: 2.1734, timezone: "Europe/Madrid" },
-      Londres: { lat: 51.5074, lon: -0.1278, timezone: "Europe/London" },
-      "Nueva York": { lat: 40.7128, lon: -74.006, timezone: "America/New_York" },
-      París: { lat: 48.8566, lon: 2.3522, timezone: "Europe/Paris" },
-      Tokio: { lat: 35.6762, lon: 139.6503, timezone: "Asia/Tokyo" },
+      madrid: { lat: 40.4168, lon: -3.7038, timezone: "Europe/Madrid", name: "Madrid" },
+      barcelona: { lat: 41.3851, lon: 2.1734, timezone: "Europe/Madrid", name: "Barcelona" },
+      londres: { lat: 51.5074, lon: -0.1278, timezone: "Europe/London", name: "Londres" },
+      "nuevayork": { lat: 40.7128, lon: -74.006, timezone: "America/New_York", name: "Nueva York" },
+      paris: { lat: 48.8566, lon: 2.3522, timezone: "Europe/Paris", name: "París" },
+      tokio: { lat: 35.6762, lon: 139.6503, timezone: "Asia/Tokyo", name: "Tokio" },
     };
     try {
-      const city = cities.Madrid;
+      const city = cities[cityName];
       if (!city) {
         // todo: add redirect util to redirect to not found page
         throw new Error(`Ciudad ${cityName} no encontrada`)
@@ -39,7 +41,7 @@
 
       return {
         location: {
-          name: cityName,
+          name: city.name,
           latitude: data.latitude,
           longitude: data.longitude,
           timezone: data.timezone,
@@ -114,7 +116,7 @@
       <div class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-3xl font-bold mb-2">🌤️ Weather in {{location.city}}</h2>
+            <h2 class="text-3xl font-bold mb-2">🌤️ Weather in {{location.name}}</h2>
             <p class="text-blue-100">Data loaded from server (simulated API delay)</p>
           </div>
           <div class="text-right">

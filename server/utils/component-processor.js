@@ -181,7 +181,11 @@ export async function processHtmlFile(filePath) {
 /**
  * Renders an HTML file (page or component) with data
  * @param {string} filePath - Full path to the HTML file
- * @param {any} data - Data to pass to getData function
+ * @param {{
+ *  [key: string]: any
+ *  req: import("http").IncomingMessage,
+ *  res: import("http").ServerResponse,
+ * }} ctx - Context request with additional data to pass to getData
  * @returns {Promise<{
  *   html: string,
  *   metadata: object,
@@ -190,7 +194,7 @@ export async function processHtmlFile(filePath) {
  *   clientComponents: Map<string, { path: string, originalPath: string, importStatement: string }>,
  * }>}
  */
-export async function renderHtmlFile(filePath, data = null) {
+export async function renderHtmlFile(filePath, context = {}) {
   const {
     getData,
     metadata,
@@ -200,7 +204,7 @@ export async function renderHtmlFile(filePath, data = null) {
     clientComponents,
   } = await processHtmlFile(filePath);
 
-  const componentData = getData ? await getData(data) : {};
+  const componentData = getData ? await getData(context) : {};
   const html = compileTemplateToHTML(template, componentData);
 
   return { html, metadata, clientCode, serverComponents, clientComponents };

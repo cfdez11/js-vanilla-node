@@ -21,6 +21,13 @@ export const routes = [
       requiresAuth: false,
     },
   },
+  {
+    path: "/:city",
+    meta: {
+      ssr: true,
+      requiresAuth: false,
+    },
+  },
 ];
 
 export const notFoundRoute = {

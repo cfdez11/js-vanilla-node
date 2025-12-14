@@ -109,7 +109,11 @@ const sendResponse = (res, statusCode, html) => {
 /**
  * Renders a page with layout and streaming support
  * @param {string} pagePath - Full path to page.html
- * @param {any} data - Additional data to pass to getData
+ * @param {{
+ *  [key: string]: any
+ *  req: import("http").IncomingMessage,
+ *  res: import("http").ServerResponse,
+ * }} ctx - Context request with additional data to pass to getData
  * @returns {Promise<{
  *  html: string,
  *  suspenseComponents: Array<{id: string, content: string}>,
@@ -117,9 +121,9 @@ const sendResponse = (res, statusCode, html) => {
  *  clientComponents: Map<string, { path: string, originalPath: string, importStatement: string }>
  * }>}
  */
-async function renderPageWithLayout(pagePath, data = null) {
+async function renderPageWithLayout(pagePath, ctx) {
   const { html, metadata, clientCode, serverComponents, clientComponents } =
-    await renderHtmlFile(pagePath, data);
+    await renderHtmlFile(pagePath, ctx);
 
   // Process server components and suspense
   const {
@@ -157,20 +161,22 @@ async function renderPageWithLayout(pagePath, data = null) {
 
 /**
  * Renders and sends a page with streaming
- * @param {import("http").ServerResponse} res
- * @param {string} pageName
- * @param {number} statusCode
- * @param {any} additionalData
+ * @param {{
+ *  res: import("http").ServerResponse,
+ *  pageName: string,
+ *  statusCode?: number,
+ *  context?: { [key: string]: any, req: import("http").IncomingMessage, res: import("http").ServerResponse }
+ * }}
  */
-async function renderAndSendPage(
+async function renderAndSendPage({
   res,
   pageName,
   statusCode = 200,
-  additionalData = null
-) {
+  context = {}
+}) {
   const pagePath = getPagePath(pageName);
   const { html, suspenseComponents, serverComponents } =
-    await renderPageWithLayout(pagePath, additionalData);
+    await renderPageWithLayout(pagePath, context);
 
   // if no suspense components, send immediately
   if (suspenseComponents.length === 0) {
@@ -235,8 +241,10 @@ export async function handlePageRequest(req, res, route) {
 
   const pageName = route.path.slice(1);
 
+  const context = { req, res };
+
   try {
-    await renderAndSendPage(res, pageName);
+    await renderAndSendPage({ res, pageName, context });
   } catch (e) {
     const errorData = {
       message: e.message || "Internal server error",
@@ -247,7 +255,7 @@ export async function handlePageRequest(req, res, route) {
     };
 
     try {
-      await renderAndSendPage(res, "error", 500, errorData);
+      await renderAndSendPage({ res, pageName: "error", statusCode: 500, context: { ...context, ...errorData } });
     } catch (err) {
       console.error(`Failed to render error page: ${err.message}`);
       sendResponse(res, 500, FALLBACK_ERROR_HTML);
