@@ -2,11 +2,14 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { handlePageRequest } from "./router.js";
-import { errorRoute, notFoundRoute, routes } from "./_app/routes.js"; // importa tambien el movie
-import { generateAllClientComponents } from "./utils/component-processor.js";
+import { routes } from "./_app/_routes.js";
+import { generateAllClientComponents, generateRoutes } from "./utils/component-processor.js";
 
 // Pre-generate all client components to have their import statements ready
 generateAllClientComponents();
+
+// generate routes automatically
+generateRoutes();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,11 +26,13 @@ const registerSSRRoutes = (app, routes) => {
 
 registerSSRRoutes(app, routes);
 
-app.get(errorRoute.path, async (req, res) => await handlePageRequest(req, res, errorRoute));
-
 app.use(async (req, res) => {
-  res.status(404);
-  handlePageRequest(req, res, notFoundRoute);
+  const notFoundRoute = routes.find(r => r.isNotFound);
+  if (notFoundRoute) {
+    return handlePageRequest(req, res, notFoundRoute);
+  }
+
+  res.status(404).send("Page not found");
 });
 
 app.listen(3000, () => {

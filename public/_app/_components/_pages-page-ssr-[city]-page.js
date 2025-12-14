@@ -1,7 +1,7 @@
 import { effect } from '/public/_app/services/reactive.js';
 import { html } from '/public/_app/services/html.js';  
 
-    export const metadata = {"title":"Weather ISR - Server Side Rendering","description":"Weather page with Server-Side Rendering. All data is loaded on the server before sending the page to the client.","revalidate":60}
+    export const metadata = {"title":"Weather ISR - Server Side Rendering","description":"Weather page with Server-Side Rendering. All data is loaded on the server before sending the page to the client.","revalidateSeconds":60}
     
     export function hydrateClientComponent(marker) {
       

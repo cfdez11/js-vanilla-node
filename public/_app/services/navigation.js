@@ -13,10 +13,10 @@ export const routes = [
   {
     path: "/page-csr",
     component: pageCSR.hydrateClientComponent,
-    metadata: pageCSR.metadata,
     meta: {
       ssr: false,
       requiresAuth: false,
+      ...(pageCSR.metadata || {}),
     },
   },
   {
@@ -36,10 +36,10 @@ export const routes = [
   {
     path: "/page-csr/:city",
     component: pageCSRDynamic.hydrateClientComponent,
-    metadata: pageCSRDynamic.metadata,
     meta: {
       ssr: false,
       requiresAuth: false,
+      ...(pageCSRDynamic.metadata || {}),
     },
   },
   // {
@@ -149,7 +149,7 @@ const addMetadata = (metadata) => {
  * 
  * @param {{
  * path: string,
- * meta: { ssr: boolean, requiresAuth: false }
+ * meta: { ssr: boolean, requiresAuth: false, [key: string]: any }
  * }} route 
  * @param {string} path 
  * @returns {void}
@@ -177,7 +177,7 @@ function renderPage(route, path) {
   route.component(marker);
 
   if (route.metadata) {
-    addMetadata(route.metadata);
+    addMetadata(route.meta);
   }
 
   addHydrateClientComponentScript();

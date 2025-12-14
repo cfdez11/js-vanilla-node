@@ -8,7 +8,6 @@ import {
   renderSuspenseComponent,
   generateReplacementContent,
 } from "./utils/streaming.js";
-import { errorRoute, notFoundRoute } from "./_app/routes.js";
 import { getCachedComponentHtml, setCachedComponentHtml } from "./utils/cache.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -249,11 +248,11 @@ async function renderAndSendPage({
   let abortedStream = false;
   let errorStream = false
 
-  res.on("close", () => abortedStream = true);
+  context.res.on("close", () => abortedStream = true);
 
   // Send initial HTML (before </body>)
   const [beforeClosing] = html.split("</body>");
-  sendStartStreamChunkResponse(context.res, beforeClosing, htmlChunks)
+  sendStartStreamChunkResponse(context.res, 200, beforeClosing, htmlChunks)
 
   // Stream suspense components
   const renderPromises = suspenseComponents.map(async (suspenseComponent) => {
@@ -298,11 +297,8 @@ async function renderAndSendPage({
  */
 export async function handlePageRequest(req, res, route) {
   if (!route) {
+    const notFoundRoute = serverRoutes.find(r => r.isNotFound);
     return handlePageRequest(req, res, notFoundRoute);
-  }
-
-  if (route === errorRoute.path) {
-    throw new Error("Simulated error for testing error page.");
   }
 
   const pageName = route.path.slice(1);

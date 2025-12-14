@@ -593,3 +593,129 @@ export async function generateAllClientComponents() {
 
   console.log(`Client components generated`);
 }
+
+/**
+ * Converts a file path to a server route path.
+ * Dynamic segments in brackets [param] are converted to :param for Express-style routing.
+ *
+ * @param {string} filePath - Full file path to the page (e.g., "pages/page-csr/[city]/page.html").
+ * @param {string} pagesDir - Base pages directory to remove from the path.
+ * @returns {string} Server route path (e.g., "/page-csr/:city").
+ */
+function getRoutePath(filePath, pagesDir) {
+  let route = filePath.replace(pagesDir, '').replace('/page.html', '');
+  route = route.replace(/\[([^\]]+)\]/g, ':$1'); // [param] -> :param
+  if (!route.startsWith('/')) route = '/' + route;
+  return route;
+}
+
+/**
+ * Converts a file path to the original public route path.
+ * Keeps dynamic segments as [param].
+ *
+ * @param {string} filePath - Full file path to the page.
+ * @param {string} pagesDir - Base pages directory to remove from the path.
+ * @returns {string} Public route path (e.g., "/page-csr/[city]").
+ */
+function getOriginalRoutePath(filePath, pagesDir) {
+  let route = filePath.replace(pagesDir, '').replace('/page.html', '');
+  if (!route.startsWith('/')) route = '/' + route;
+  return route;
+}
+
+/**
+ * Generates server and client route files by scanning the pages directory.
+ * Each route object contains path, serverPath, isNotFound flag, and meta information.
+ * Outputs `_routes.js` in both server and public directories.
+ *
+ * @returns {Promise<void>}
+ */
+export async function generateRoutes() {
+  const pagesDir = path.resolve(rootPath, "pages");
+  const outputClientDir = path.resolve(rootPath, "public", "_app");
+  const outputServerDir = path.resolve(rootPath, "server", "_app");
+
+  // Ensure output directories exists
+  await fs.mkdir(outputClientDir, { recursive: true });
+  await fs.mkdir(outputServerDir, { recursive: true });
+
+  // Read all .html files in components and pages directory
+  const pageFiles = await readDirectoryRecursive(pagesDir);
+
+  const htmlFiles = pageFiles.filter((file) => file.fullpath.endsWith(".html"));
+
+  const serverRoutes = [];
+  const clientRoutes = [];
+
+  for (const file of htmlFiles) {
+
+    if(file.name !== 'page.html') {
+      continue;
+    }
+    const { getData,  metadata } = await processHtmlFile(file.fullpath);
+
+    const serverRoute = {
+      path: getOriginalRoutePath(file.fullpath, pagesDir),
+      serverPath: getRoutePath(file.fullpath, pagesDir),
+      isNotFound: file.path.includes('/not-found/'),
+      meta: {
+        ssr: typeof getData === 'function',
+        requiresAuth: false,
+        revalidateSeconds: metadata.revalidateSeconds ?? 0,
+      }
+    };
+
+    const clientComponent = {
+      path: file.path,
+      serverPath: file.path,
+      component: null,
+      meta: {
+        ssr: typeof getData === 'function',
+        requiresAuth: false,
+        revalidateSeconds: metadata.revalidateSeconds ?? 0,
+        extrameta: null,
+      }
+    }
+
+    serverRoutes.push(serverRoute);
+    clientRoutes.push(clientComponent);
+  }
+
+  const comments = `
+  /**
+   * @typedef {Object} RouteMeta
+   * @property {boolean} ssr - Indicates if the page is server-side rendered (SSR)
+   * @property {boolean} requiresAuth - Indicates if the page requires authentication
+   * @property {number} revalidateSeconds - Time in seconds for ISR revalidation
+   */
+
+  /**
+   * @typedef {Object} Route
+   * @property {string} path - Public route used by the router (e.g., "/page/[city]")
+   * @property {string} serverPath - Server route used for matching (e.g., "/page/:city")
+   * @property {boolean} isNotFound - Indicates if this route corresponds to the 404 page
+   * @property {RouteMeta} meta - Metadata for the route
+   */
+
+  /**
+   * List of application routes.
+   * Each object defines the public path, server path, whether it is a 404 route, and metadata.
+   *
+   * @type {Route[]}
+   */
+  `
+  
+  await fs.writeFile(
+    path.join(outputServerDir, "_routes.js"),
+    `${comments}\nexport const routes = ${JSON.stringify(serverRoutes, null, 2)};
+    `
+  );
+
+  await fs.writeFile(
+    path.join(outputClientDir, "_routes.js"),
+    `${comments}\nexport const routes = ${JSON.stringify(clientRoutes, null, 2)};`
+  );
+
+
+  console.log(`Routes generated`);
+}
