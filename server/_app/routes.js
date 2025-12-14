@@ -32,6 +32,14 @@ export const routes = [
       requiresAuth: false,
     },
   },
+  {
+    path: "/page-csr/[city]",
+    serverPath: "/page-csr/:city",
+    meta: {
+      ssr: false,
+      requiresAuth: false,
+    },
+  },
 ];
 
 export const notFoundRoute = {

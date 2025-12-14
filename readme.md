@@ -363,8 +363,9 @@ Future features planned for implementation:
 
 - [x] **Language sintaxis** - Unify sintaxis to use same conditional tags, lists, etc in server and client.
 - [x] **Inject client component script** - Use other technique to inject js in client, to avoid have scripts in html, check Nextjs, svelte, vue
+- [ ] **Metadata dynamic** - Optional add export func if the user wants to fetch. Also this func can receive the result of getData to not repeat the same fetch
 - [ ] **Fix error replace marker** Only occurs when template has multiple childs no wrapped in div /fragment
-- [ ] **Add dynamic pages CSR and SSR** - Add dynamic routes
+- [x] **Add dynamic pages CSR and SSR** - Add dynamic routes
 - [ ] **Incremental Static Regeneration / Static Pages** - Regenerate static pages on-demand / never
 - [ ] **Generate Static Params** - Pre-generate pages with dynamic routes at build time
 - [ ] **Cache getData** - Implement caching layer for data fetching functions

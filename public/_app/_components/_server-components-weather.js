@@ -1,8 +1,11 @@
-<script client>
-  import { reactive, computed } from "/public/_app/services/reactive.js"; 
-  import { useRouteParams } from "/public/_app/services/navigation.js";
+import { reactive, computed, effect } from "/public/_app/services/reactive.js"
+import { useRouteParams } from "/public/_app/services/navigation.js"
+import { html } from '/public/_app/services/html.js';  
 
-  const weatherCodes = {
+    export const metadata = {}
+    
+    export function hydrateClientComponent(marker) {
+      const weatherCodes = {
     0: { description: "Cielo despejado", icon: "☀️", color: "text-yellow-500" },
     1: { description: "Mayormente despejado", icon: "🌤️", color: "text-yellow-400" },
     2: { description: "Parcialmente nublado", icon: "⛅", color: "text-gray-400" },
@@ -141,30 +144,30 @@
   const currentWeather = computed(() =>
     state.data ? getWeatherInfo(state.data.current?.weatherCode) : null
   );
-</script>
-
-<template>
-  <div>
+      
+      let root = null;
+      function render() {
+        const node = html`<div>
   <!-- Header -->
   <div class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
       <div>
-        <h2 class="text-3xl font-bold mb-2">🌤️ Weather in {{ state.data?.location?.name }}</h2>
+        <h2 class="text-3xl font-bold mb-2">🌤️ Weather in ${state.data?.location?.name}</h2>
         <p class="text-blue-100">Data loaded from client (real-time API)</p>
       </div>
 
-      <div v-show="!cityParams" class="flex flex-wrap gap-2">
-        <button v-for="city in Object.keys(cities)" @click="changeCity(city)"
+      <div v-show="${!cityParams}" class="flex flex-wrap gap-2">
+        ${Object.keys(cities).map(city => html`<button @click="${() => changeCity(city)}"
           class="px-3 py-2 rounded-lg text-sm font-medium transition-all"
-          :class="state.selectedCity === city ? 'bg-white text-blue-600' : 'bg-blue-600 text-white hover:bg-blue-700'">
-          {{ cities[city]?.name }}
-        </button>
+          :class="${state.selectedCity === city ? 'bg-white text-blue-600' : 'bg-blue-600 text-white hover:bg-blue-700'}">
+          ${cities[city]?.name}
+        </button>`)}
       </div>
     </div>
   </div>
 
   <!-- Loading -->
-  <div v-if="state.status === 'loading' || state.status === 'idle'" class="flex items-center justify-center py-12">
+  <div v-if="${state.status === 'loading' || state.status === 'idle'}" class="flex items-center justify-center py-12">
     <div class="text-center space-y-4">
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
       <p class="text-gray-600">Cargando datos meteorológicos...</p>
@@ -172,18 +175,18 @@
   </div>
 
   <!-- Error -->
-  <div v-else-if="state.status === 'error'" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+  <div v-else-if="${state.status === 'error'}" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
     <div class="text-red-500 text-4xl mb-4">❌</div>
     <h3 class="text-red-800 font-bold text-lg mb-2">Error al cargar el clima</h3>
-    <p class="text-red-600 mb-4">{{ state.error }}</p>
-    <button @click="fetchWeather(state.selectedCity)"
+    <p class="text-red-600 mb-4">${state.error}</p>
+    <button @click="${() => fetchWeather(state.selectedCity)}"
       class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
       Reintentar
     </button>
   </div>
 
   <!-- No data -->
-  <div v-else-if="!state.data" class="text-center py-12">
+  <div v-else-if="${!state.data}" class="text-center py-12">
     No hay datos disponibles
   </div>
 
@@ -198,10 +201,10 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-gray-500 text-sm font-medium">Temperatura</p>
-              <p class="text-3xl font-bold text-gray-800">{{ state.data?.current?.temperature }}°C</p>
-              <p class="text-gray-400 text-sm">Sensación: {{ state.data?.current?.apparentTemperature }}°C</p>
+              <p class="text-3xl font-bold text-gray-800">${state.data?.current?.temperature}°C</p>
+              <p class="text-gray-400 text-sm">Sensación: ${state.data?.current?.apparentTemperature}°C</p>
             </div>
-            <div class="text-4xl" :class="currentWeather.color">{{ currentWeather.icon }}</div>
+            <div class="text-4xl" :class="${currentWeather.color}">${currentWeather.icon}</div>
           </div>
         </div>
 
@@ -210,8 +213,8 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-gray-500 text-sm font-medium">Humedad</p>
-              <p class="text-3xl font-bold text-gray-800">{{ state.data?.current?.humidity }}%</p>
-              <p class="text-gray-400 text-sm">{{ currentWeather.description }}</p>
+              <p class="text-3xl font-bold text-gray-800">${state.data?.current?.humidity}%</p>
+              <p class="text-gray-400 text-sm">${currentWeather.description}</p>
             </div>
             <div class="text-4xl text-green-500">💧</div>
           </div>
@@ -222,7 +225,7 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-gray-500 text-sm font-medium">Viento</p>
-              <p class="text-3xl font-bold text-gray-800">{{ state.data?.current?.windSpeed }} km/h</p>
+              <p class="text-3xl font-bold text-gray-800">${state.data?.current?.windSpeed} km/h</p>
               <p class="text-gray-400 text-sm">Velocidad del viento</p>
             </div>
             <div class="text-4xl text-purple-500">💨</div>
@@ -234,7 +237,7 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-gray-500 text-sm font-medium">Precipitación</p>
-              <p class="text-3xl font-bold text-gray-800">{{ state.data?.current?.precipitation }} mm</p>
+              <p class="text-3xl font-bold text-gray-800">${state.data?.current?.precipitation} mm</p>
               <p class="text-gray-400 text-sm">Actual</p>
             </div>
             <div class="text-4xl text-orange-500">🌧️</div>
@@ -244,5 +247,15 @@
       </div>
     </div>
   </div>
-  </div>
-</template>
+  </div>`;
+        if (!root) {
+          root = node;
+          marker.replaceWith(node);
+        } else {
+          root.replaceWith(node);
+          root = node;
+        }
+      }
+
+      effect(() => render());
+    }

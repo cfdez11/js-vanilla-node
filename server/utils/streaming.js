@@ -85,7 +85,7 @@ async function renderClientComponents(html, clientComponents) {
   const allMatches = [];
   const allScripts = [];
 
-  for (const componentName of clientComponents.keys()) {
+  for (const [componentName, { originalPath }] of clientComponents.entries()) {
     const escapedName = componentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const componentRegex = new RegExp(
       `<${escapedName}(?![a-zA-Z0-9_-])\\s*([^>]*?)\\s*(?:\\/>|>\\s*<\\/${escapedName}(?![a-zA-Z0-9_-])>)`,
@@ -112,7 +112,7 @@ async function renderClientComponents(html, clientComponents) {
     for (let i = replacements.length - 1; i >= 0; i--) {
       const { start, end } = replacements[i];
 
-      const htmlComponent = await processClientComponent(componentName);
+      const htmlComponent = await processClientComponent(componentName, originalPath);
 
       processedHtml =
         processedHtml.slice(0, start) +

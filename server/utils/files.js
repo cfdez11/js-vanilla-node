@@ -12,6 +12,7 @@ const rootDir = path.resolve(__dirname, "..", "..");
  * @returns {Promise<{
  *  fullpath: string;
  *  name: string;
+ *  path: string;
  * }[]>} - A promise that resolves to an array of file paths.
  */
 export async function readDirectoryRecursive(dir) {
@@ -25,6 +26,7 @@ export async function readDirectoryRecursive(dir) {
       files.push(...await readDirectoryRecursive(fullpath));
     } else {
       files.push({
+        path: fullpath.replace(rootDir, ''),
         fullpath,
         name: entry.name,
       });

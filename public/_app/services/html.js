@@ -352,5 +352,14 @@ function processAttributes(element, markers, values) {
 
       element.removeAttribute(attr.name);
     }
+
+    // v-show directive
+    if (attr.name === "v-show") {
+      const idx = markers.findIndex((m) => attr.value.includes(m));
+      const value = idx !== -1 ? values[idx] : false;
+      element.style.display = value ? "" : "none";
+      element.removeAttribute("v-show");
+      continue;
+    }
   }
 }

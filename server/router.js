@@ -141,7 +141,7 @@ async function renderPageWithLayout(pagePath, ctx) {
     clientCode,
     clientComponentsScripts,
     clientComponents,
-    addHydrateClientComponentsScript: suspenseComponents.length > 0,
+    addHydrateClientComponentsScript: clientComponents.size > 0,
   });
 
   const layoutTemplate = await getLayoutTemplate();
