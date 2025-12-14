@@ -2,6 +2,7 @@
 export const routes = [
   {
     path: "/",
+    serverPath: "/",
     meta: {
       ssr: true,
       requiresAuth: false,
@@ -9,6 +10,7 @@ export const routes = [
   },
   {
     path: "/page-csr",
+    serverPath: "/page-csr",
     meta: {
       ssr: false,
       requiresAuth: false,
@@ -16,13 +18,15 @@ export const routes = [
   },
   {
     path: "/page-ssr",
+    serverPath: "/page-ssr",
     meta: {
       ssr: true,
       requiresAuth: false,
     },
   },
   {
-    path: "/:city",
+    path: "/page-ssr/[city]",
+    serverPath: "/page-ssr/:city",
     meta: {
       ssr: true,
       requiresAuth: false,
@@ -32,6 +36,7 @@ export const routes = [
 
 export const notFoundRoute = {
   path: "/not-found",
+  serverPath: "/not-found",
   meta: {
     ssr: true,
     requiresAuth: false,
@@ -40,6 +45,7 @@ export const notFoundRoute = {
 
 export const errorRoute = {
   path: "/error",
+  serverPath: "/error",
   meta: {
     ssr: true,
     requiresAuth: false,

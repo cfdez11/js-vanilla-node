@@ -17,7 +17,7 @@ app.use("/public", express.static(path.join(__dirname, "../public")));
 
 const registerSSRRoutes = (app, routes) => {
   routes.forEach((route) => {
-    app.get(route.path, (req, res) => handlePageRequest(req, res, route));
+    app.get(route.serverPath, (req, res) => handlePageRequest(req, res, route));
   });
 };
 
