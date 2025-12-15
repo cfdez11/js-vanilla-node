@@ -369,6 +369,7 @@ Future features planned for implementation:
 - [x] **Incremental Static Regeneration / Static Pages** - Regenerate static pages on-demand / never
 - [x] **Generate Static Params** - Pre-generate pages with dynamic routes at build time
 - [x] **Auto generated routes** - Auto generate server and client routes
+- [ ] **Unify** - Same constants files, unify fs functions in files, unify comments, etc
 - [ ] **Cache getData** - Implement caching layer for data fetching functions
 - [ ] **Cache Server Pages** - Cache rendered server pages for improved performance
 - [ ] **Link Component** - Custom link component with prefetching capabilities
