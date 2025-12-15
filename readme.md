@@ -366,8 +366,9 @@ Future features planned for implementation:
 - [ ] **Metadata dynamic** - Optional add export func if the user wants to fetch. Also this func can receive the result of getData to not repeat the same fetch
 - [ ] **Fix error replace marker** Only occurs when template has multiple childs no wrapped in div /fragment
 - [x] **Add dynamic pages CSR and SSR** - Add dynamic routes
-- [ ] **Incremental Static Regeneration / Static Pages** - Regenerate static pages on-demand / never
-- [ ] **Generate Static Params** - Pre-generate pages with dynamic routes at build time
+- [x] **Incremental Static Regeneration / Static Pages** - Regenerate static pages on-demand / never
+- [x] **Generate Static Params** - Pre-generate pages with dynamic routes at build time
+- [x] **Auto generated routes** - Auto generate server and client routes
 - [ ] **Cache getData** - Implement caching layer for data fetching functions
 - [ ] **Cache Server Pages** - Cache rendered server pages for improved performance
 - [ ] **Link Component** - Custom link component with prefetching capabilities
@@ -375,6 +376,7 @@ Future features planned for implementation:
 - [ ] **Restructure Directories** - Optimize project structure and organization
 - [ ] **Authentication** - Built-in authentication system with middleware support
 - [ ] **Auto-generated Files** - Automatic generation of routes, utility files, and configurations based on code and pages directories
+- [ ] **Optimize auto generated routes** - use promise all
 - [ ] **Layouts** - Layouts inside sub routes
 - [ ] **Regeneration in background** - Regenerate page after send response (locks)
 - [ ] **Cache with CDN** 

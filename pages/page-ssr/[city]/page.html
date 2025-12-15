@@ -1,7 +1,19 @@
 <script server>
   import { delay } from "server/utils/delay.js";
 
+  async function getStaticPaths() {
+    return [
+      { params: { city: "madrid" } },
+      { params: { city: "barcelona" } },
+      { params: { city: "londres" } },
+      { params: { city: "nuevayork" } },
+      { params: { city: "paris" } },
+      { params: { city: "tokio" } },
+    ];
+  }
+
   async function getData({ req }) {
+    await delay(2000);
     const cityName = req.params.city?.toLowerCase() || "madrid";
 
     const cities = {
@@ -89,7 +101,7 @@
     title: "Weather ISR - Server Side Rendering",
     description:
       "Weather page with Server-Side Rendering. All data is loaded on the server before sending the page to the client.",
-      revalidateSeconds: 60
+      revalidateSeconds: 10
   };
 </script>
 <template>

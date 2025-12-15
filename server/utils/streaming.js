@@ -130,6 +130,7 @@ async function renderClientComponents(html, clientComponents) {
  * Server components inside <Suspense> boundaries are saved in suspenseComponents.
  * @param {string} pageHtml
  * @param {Map<string, { path: string }>} serverComponents
+ * @param {boolean} awaitSuspenseComponents - If true, renders suspense components immediately
  * @returns {Promise<{
  *   html: string,
  *   suspenseComponents: Array<{
@@ -138,7 +139,7 @@ async function renderClientComponents(html, clientComponents) {
  *   }>
  * }>}
  */
-async function renderServerComponents(pageHtml, serverComponents = new Map()) {
+async function renderServerComponents(pageHtml, serverComponents = new Map(), awaitSuspenseComponents = false) {
   const suspenseComponents = [];
   let suspenseId = 0;
   let html = pageHtml;
@@ -151,9 +152,11 @@ async function renderServerComponents(pageHtml, serverComponents = new Map()) {
     const id = `suspense-${suspenseId++}`;
     const [fullMatch, fallback, content] = match;
 
-    // Render components in fallback
+    const suspenseContent = awaitSuspenseComponents ? content : fallback;
+
+    // Render components in fallback if not awaiting suspense or in content if awaiting suspense
     const fallbackHtml = await processServerComponents(
-      fallback,
+      suspenseContent,
       serverComponents
     );
 
@@ -181,6 +184,7 @@ async function renderServerComponents(pageHtml, serverComponents = new Map()) {
  *  pageHtml: string,
  *  serverComponents: Map<string, { path: string, originalPath: string, importStatement: string }>,
  *  clientComponents: Map<string, { path: string, originalPath: string, importStatement: string }>,
+ *  awaitSuspenseComponents: boolean,
  * }}
  * @returns {Promise<{
  *   html: string,
@@ -195,12 +199,13 @@ export async function renderComponents({
   html,
   serverComponents = new Map(),
   clientComponents = new Map(),
+  awaitSuspenseComponents = false,
 }) {
   const hasServerComponents = serverComponents.size > 0;
   const hasClientComponents = clientComponents.size > 0;
   
   const { html: htmlServerComponents,  suspenseComponents } = hasServerComponents ? 
-    await renderServerComponents(html, serverComponents) : 
+    await renderServerComponents(html, serverComponents, awaitSuspenseComponents) : 
     { 
       html, 
       suspenseComponents: [],

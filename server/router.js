@@ -1,22 +1,10 @@
-import path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs/promises";
-import { compileTemplateToHTML } from "./utils/template.js";
-import { renderHtmlFile } from "./utils/component-processor.js";
 import {
-  renderComponents,
   renderSuspenseComponent,
   generateReplacementContent,
 } from "./utils/streaming.js";
 import { getCachedComponentHtml, setCachedComponentHtml } from "./utils/cache.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PAGES_DIR = path.resolve(__dirname, "..", "pages");
-
-const DEFAULT_METADATA = {
-  title: "Vanilla JS App",
-  description: "Default description",
-};
+import { getPagePath } from "./utils/files.js";
+import { renderPageWithLayout } from "./utils/component-processor.js";
 
 const FALLBACK_ERROR_HTML = `
   <!DOCTYPE html>
@@ -29,71 +17,6 @@ const FALLBACK_ERROR_HTML = `
   </body>
   </html>
 `;
-
-/**
- * Builds the path to a page file
- * @param {string} pageName
- * @returns {string}
- */
-const getPagePath = (pageName) =>
-  path.resolve(PAGES_DIR, pageName, "page.html");
-
-/**
- * Retrieves layout HTML string
- * @returns {Promise<string>}
- */
-const getLayoutTemplate = async () => {
-  const layoutPath = path.resolve(PAGES_DIR, "layout.html");
-  return await fs.readFile(layoutPath, "utf-8");
-};
-
-/**
- * Generates client script tag
- * @param {{
- * clientCode: string,
- * clientComponentsScripts: Array<string>,
- * clientComponents: 
- *  Map<string, {
- *    path: string,
- *    originalPath: string,
- *    importStatement: string
- *  }>
- * addHydrateClientComponentsScript: boolean,
- * }} params
- * @returns {string}
- */
-function generateClientScriptTags({
-  clientCode,
-  clientComponentsScripts = [],
-  clientComponents = new Map(),
-  addHydrateClientComponentsScript = false, 
-}) {
-  if (!clientCode) return "";
-  // replace component imports to point to .js files
-  for (const { importStatement } of clientComponents.values()) {
-    clientCode = clientCode.replace(`${importStatement};`, '').replace(importStatement, "");
-  }
-
-  const clientCodeWithoutComponentImports = clientCode
-    .split("\n")
-    .filter((line) => !/^\s*import\s+.*['"].*\.html['"]/.test(line))
-    .join("\n")
-    .trim();
-
-  const scripts = `
-    ${addHydrateClientComponentsScript 
-      ? `<script src="/public/_app/services/hydrate-client-components.js"></script>` 
-      : ""
-    }
-    ${clientCodeWithoutComponentImports.trim() 
-      ? `<script type="module">\n${clientCodeWithoutComponentImports}\n</script>`
-      : ""
-    }
-    ${clientComponentsScripts?.length ? clientComponentsScripts.join("\n") : ""}
-  `;
-
-  return scripts.trim();
-}
 
 /**
  * Sends HTML response
@@ -140,65 +63,13 @@ const endStreamResponse = (res, htmlChunks) => {
   res.end();
   htmlChunks.push("</body></html>")
 }
-/**
- * Renders a page with layout and streaming support
- * @param {string} pagePath - Full path to page.html
- * @param {{
- *  [key: string]: any
- *  req: import("http").IncomingMessage,
- *  res: import("http").ServerResponse,
- * }} ctx - Context request with additional data to pass to getData
- * @returns {Promise<{
- *  html: string,
- *  suspenseComponents: Array<{id: string, content: string}>,
- *  serverComponents: Map<string, { path: string, originalPath: string, importStatement: string }>,
- *  clientComponents: Map<string, { path: string, originalPath: string, importStatement: string }>
- * }>}
- */
-async function renderPageWithLayout(pagePath, ctx) {
-  const { html, metadata, clientCode, serverComponents, clientComponents } =
-    await renderHtmlFile(pagePath, ctx);
-
-  // Process server components and suspense
-  const {
-    html: processedHtml,
-    suspenseComponents,
-    clientComponentsScripts = [],
-  } = await renderComponents({
-    html,
-    serverComponents,
-    clientComponents,
-  });
-
-  // Wrap in layout
-  const clientScripts = generateClientScriptTags({
-    clientCode,
-    clientComponentsScripts,
-    clientComponents,
-    addHydrateClientComponentsScript: clientComponents.size > 0,
-  });
-
-  const layoutTemplate = await getLayoutTemplate();
-  const fullHtml = compileTemplateToHTML(layoutTemplate, {
-    children: processedHtml,
-    clientScripts,
-    metadata: { ...DEFAULT_METADATA, ...metadata },
-  });
-
-  return {
-    html: fullHtml,
-    suspenseComponents,
-    serverComponents,
-    clientComponents,
-  };
-}
 
 /**
  * Renders and sends a page with streaming
  * @param {{
  *  pageName: string,
  *  statusCode?: number,
- *  context: { [key: string]: any, req: import("http").IncomingMessage, res: import("http").ServerResponse }
+ *  context?: { [key: string]: any, req: import("http").IncomingMessage, res: import("http").ServerResponse }
  *  route: { 
  *    path: string,
  *    serverPath: string,
@@ -221,7 +92,7 @@ async function renderAndSendPage({
   const isISR = revalidateSeconds > 0;
 
   if(isISR) {
-    const { html: cachedHtml, isStale } = getCachedComponentHtml({ 
+    const { html: cachedHtml, isStale } = await getCachedComponentHtml({ 
       componentPath: context.req.url, 
       revalidateSeconds: route.meta.revalidateSeconds,
     });

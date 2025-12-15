@@ -2,21 +2,21 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { handlePageRequest } from "./router.js";
-import { routes } from "./_app/_routes.js";
-import { generateAllClientComponents, generateRoutes } from "./utils/component-processor.js";
+import { generateComponentsAndFillCache, generateRoutes} from "./utils/component-processor.js";
 
-// Pre-generate all client components to have their import statements ready
-generateAllClientComponents();
+// Pre-generate all client and server components to have their import statements ready
+await generateComponentsAndFillCache();
 
 // generate routes automatically
-generateRoutes();
+const { serverRoutes } = await generateRoutes();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const publicDir = path.join(__dirname, "..", "public");
 
 const app = express();
 
-app.use("/public", express.static(path.join(__dirname, "../public")));
+app.use("/public", express.static(publicDir));
 
 const registerSSRRoutes = (app, routes) => {
   routes.forEach((route) => {
@@ -24,10 +24,10 @@ const registerSSRRoutes = (app, routes) => {
   });
 };
 
-registerSSRRoutes(app, routes);
+registerSSRRoutes(app, serverRoutes);
 
 app.use(async (req, res) => {
-  const notFoundRoute = routes.find(r => r.isNotFound);
+  const notFoundRoute = serverRoutes.find(r => r.isNotFound);
   if (notFoundRoute) {
     return handlePageRequest(req, res, notFoundRoute);
   }

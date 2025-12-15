@@ -1,25 +1,18 @@
 
-  /**
-   * @typedef {Object} RouteMeta
-   * @property {boolean} ssr - Indicates if the page is server-side rendered (SSR)
-   * @property {boolean} requiresAuth - Indicates if the page requires authentication
-   * @property {number} revalidateSeconds - Time in seconds for ISR revalidation
-   */
+    /**
+     * @typedef {Object} RouteMeta
+     * @property {boolean} ssr
+     * @property {boolean} requiresAuth
+     * @property {number} revalidateSeconds
+     */
 
-  /**
-   * @typedef {Object} Route
-   * @property {string} path - Public route used by the router (e.g., "/page/[city]")
-   * @property {string} serverPath - Server route used for matching (e.g., "/page/:city")
-   * @property {boolean} isNotFound - Indicates if this route corresponds to the 404 page
-   * @property {RouteMeta} meta - Metadata for the route
-   */
-
-  /**
-   * List of application routes.
-   * Each object defines the public path, server path, whether it is a 404 route, and metadata.
-   *
-   * @type {Route[]}
-   */
+    /**
+     * @typedef {Object} Route
+     * @property {string} path
+     * @property {string} serverPath
+     * @property {boolean} isNotFound
+     * @property {RouteMeta} meta
+     */
   
 export const routes = [
   {
@@ -79,7 +72,7 @@ export const routes = [
     "meta": {
       "ssr": true,
       "requiresAuth": false,
-      "revalidateSeconds": 0
+      "revalidateSeconds": 60
     }
   },
   {
@@ -93,4 +86,3 @@ export const routes = [
     }
   }
 ];
-    
