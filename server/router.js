@@ -65,21 +65,64 @@ const endStreamResponse = (res, htmlChunks) => {
 }
 
 /**
- * Renders and sends a page with streaming
- * @param {{
- *  pageName: string,
- *  statusCode?: number,
- *  context?: { [key: string]: any, req: import("http").IncomingMessage, res: import("http").ServerResponse }
- *  route: { 
- *    path: string,
- *    serverPath: string,
- *    meta: {
- *      ssr: boolean,
- *      requiresAuth: false,
- *      revalidateSeconds: 60, 
- *    }
- * }
- * }}
+ * Renders a page using SSR, optionally streams suspense components,
+ * applies Incremental Static Regeneration (ISR) when enabled,
+ * and sends the resulting HTML response to the client.
+ *
+ * This function supports:
+ * - Full server-side rendering
+ * - Streaming suspense components
+ * - ISR with cache revalidation
+ * - Graceful abort handling on client disconnect
+ *
+ * @async
+ * @function renderAndSendPage
+ *
+ * @param {Object} params
+ * @param {string} params.pageName
+ *   Name of the page to be rendered (resolved to a server component path).
+ *
+ * @param {number} [params.statusCode=200]
+ *   HTTP status code used for the response.
+ *
+ * @param {Object} [params.context={}]
+ *   Rendering context shared across server components.
+ *
+ * @param {import("http").IncomingMessage} params.context.req
+ *   Incoming HTTP request instance.
+ *
+ * @param {import("http").ServerResponse} params.context.res
+ *   HTTP response instance used to stream or send HTML.
+ *
+ * @param {Object.<string, any>} [params.context]
+ *   Additional arbitrary values exposed to the rendering pipeline.
+ *
+ * @param {Object} params.route
+ *   Matched route configuration.
+ *
+ * @param {string} params.route.path
+ *   Public route path (e.g. "/home").
+ *
+ * @param {string} params.route.serverPath
+ *   Internal server path used for resolution.
+ *
+ * @param {Object} params.route.meta
+ *   Route metadata.
+ *
+ * @param {boolean} params.route.meta.ssr
+ *   Whether the route supports server-side rendering.
+ *
+ * @param {boolean} params.route.meta.requiresAuth
+ *   Indicates if authentication is required.
+ *
+ * @param {number} params.route.meta.revalidateSeconds
+ *   ISR revalidation interval in seconds. A value > 0 enables ISR.
+ *
+ * @returns {Promise<void>}
+ *   Resolves once the response has been fully sent.
+ *
+ * @throws {Error}
+ *   Throws if rendering or streaming fails before the response is committed.
  */
 async function renderAndSendPage({
   pageName,
@@ -87,6 +130,7 @@ async function renderAndSendPage({
   context = {},
   route,
 }) {
+  // todo: check if this getPageParhWorks correctly (check with depth in pages)
   const pagePath = getPagePath(pageName);
   const revalidateSeconds = route.meta?.revalidateSeconds ?? 0;
   const isISR = revalidateSeconds > 0;
@@ -109,6 +153,7 @@ async function renderAndSendPage({
   // if no suspense components, send immediately
   if (suspenseComponents.length === 0) {
     sendResponse(context.res, statusCode, html);
+
     if(isISR) {
       setCachedComponentHtml({ componentPath: context.req.url, html });
     }
@@ -121,11 +166,11 @@ async function renderAndSendPage({
 
   context.res.on("close", () => abortedStream = true);
 
-  // Send initial HTML (before </body>)
+  // send initial HTML (before </body>)
   const [beforeClosing] = html.split("</body>");
   sendStartStreamChunkResponse(context.res, 200, beforeClosing, htmlChunks)
 
-  // Stream suspense components
+  // stream suspense components
   const renderPromises = suspenseComponents.map(async (suspenseComponent) => {
     try {
       const renderedContent = await renderSuspenseComponent(
@@ -137,14 +182,17 @@ async function renderAndSendPage({
         suspenseComponent.id,
         renderedContent
       );
+
       sendStreamChunkResponse(context.res, replacementContent, htmlChunks)
     } catch (error) {
       console.error(`Error rendering suspense ${suspenseComponent.id}:`, error);
+
       const errorContent = generateReplacementContent(
         suspenseComponent.id,
         `<div class="text-red-500">Error loading content</div>`
       );
-      res.write(errorContent);
+
+      context.res.write(errorContent);
       errorStream = true;
     }
   });
@@ -152,6 +200,7 @@ async function renderAndSendPage({
   await Promise.all(renderPromises);
 
   endStreamResponse(context.res, htmlChunks);
+
   if(isISR && !abortedStream && !errorStream) {
     setCachedComponentHtml({
       componentPath: pagePath,
@@ -161,10 +210,32 @@ async function renderAndSendPage({
 }
 
 /**
- * Handles incoming page request
+ * Handles an incoming HTTP request for a page route.
+ *
+ * Resolves the appropriate route, builds the rendering context,
+ * delegates rendering to `renderAndSendPage`, and ensures that
+ * errors are handled gracefully by rendering a fallback error page.
+ *
+ * @async
+ * @function handlePageRequest
+ *
  * @param {import("http").IncomingMessage} req
+ *   Incoming HTTP request.
+ *
  * @param {import("http").ServerResponse} res
- * @param {{ path: string, meta: object}} route
+ *   HTTP response used to send rendered content.
+ *
+ * @param {Object|null} route
+ *   Matched route definition. If null, a fallback 404 route is used.
+ *
+ * @param {string} route.path
+ *   Public URL path of the route.
+ *
+ * @param {Object} route.meta
+ *   Route metadata used during rendering.
+ *
+ * @returns {Promise<void>}
+ *   Resolves once the response has been fully handled.
  */
 export async function handlePageRequest(req, res, route) {
   if (!route) {

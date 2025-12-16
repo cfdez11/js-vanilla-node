@@ -3,20 +3,37 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { handlePageRequest } from "./router.js";
 import { generateComponentsAndFillCache, generateRoutes} from "./utils/component-processor.js";
-
-// Pre-generate all client and server components to have their import statements ready
-await generateComponentsAndFillCache();
-
-// generate routes automatically
-const { serverRoutes } = await generateRoutes();
+import { initializeDirectories } from "./utils/files.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const publicDir = path.join(__dirname, "..", "public");
+await initializeDirectories();
+
+console.warn("Starting server..." + new Date().toISOString());
+
+// Pre-generate all client and server components to have their import statements ready
+await generateComponentsAndFillCache();
+console.warn("Components generated." + new Date().toISOString());
+
+// generate routes automatically
+const { serverRoutes } = await generateRoutes();
+console.warn("Routes generated." + new Date().toISOString());
+
+
 
 const app = express();
 
-app.use("/public", express.static(publicDir));
+console.warn("Server is ready to accept requests." + publicDir);
+// app.use("/public", express.static(publicDir));
+
+app.use("/public", express.static(publicDir, {
+  setHeaders(res, filePath) {
+    if (filePath.endsWith(".js")) {
+      res.setHeader("Content-Type", "application/javascript");
+    }
+  }
+}));
 
 const registerSSRRoutes = (app, routes) => {
   routes.forEach((route) => {
@@ -36,5 +53,5 @@ app.use(async (req, res) => {
 });
 
 app.listen(3000, () => {
-  console.log("Server running in http://localhost:3000");
+  console.log("Server running in http://localhost:3000");  
 });

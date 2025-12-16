@@ -3,7 +3,7 @@ import {
   renderHtmlFile,
 } from "./component-processor.js";
 
-// processNode of compileTemplateToHTML remove binding characters (:)
+// processNode funcion from compileTemplateToHTML remove binding characters (:)
 const suspenseRegex = /<Suspense\s+fallback="([^"]*)">([\s\S]*?)<\/Suspense>/g;
 
 /**

@@ -1,6 +1,5 @@
 import { routes } from '../_routes.js';
 
-
 function findRoute(path) {
   return routes.find((r) => {
     if (typeof r.path === "string") return r.path === path;
@@ -29,7 +28,7 @@ function handleClickLink(event, link) {
 /**
  * Must be initialized inside a DOMContentLoaded event listener
  */
-function initializeRouter() {
+export async function initializeRouter() {
   window.addEventListener("popstate", () => {
     navigate(location.pathname, false);
   });
@@ -55,6 +54,7 @@ function addHydrateClientComponentScript() {
 
   const hydrateScript = document.createElement("script");
   hydrateScript.src = "/public/_app/services/hydrate-client-components.js";
+  hydrateScript.type = "module";
   document.head.appendChild(hydrateScript);
 }
 
@@ -82,7 +82,7 @@ const addMetadata = (metadata) => {
  * @param {string} path 
  * @returns {void}
  */
-function renderPage(route, path) {
+export function renderPage(route, path) {
   const main = document.querySelector("main");
 
   if (!route || !route.component) {
@@ -117,7 +117,7 @@ function renderPage(route, path) {
  * @param {boolean} addToHistory 
  * @returns {void}
  */
-function navigate(path, addToHistory = true) {
+export function navigate(path, addToHistory = true) {
   const routePath = path.split("?")[0];
   const route = findRoute(routePath);
 
@@ -217,7 +217,7 @@ function buildQueryString(raw) {
  *
  * @returns {Object}
  */
-function useQueryParams(options = {}) {
+export function useQueryParams(options = {}) {
   const {
     schema = {},
     replace = false,
@@ -391,7 +391,8 @@ function useQueryParams(options = {}) {
  *  Returns: { userId: '1', postId: '53' }
  */
 export function useRouteParams(currentPath = window.location.pathname) {
-  const pathParts = currentPath.split('/').filter(Boolean);
+  try {
+const pathParts = currentPath.split('/').filter(Boolean);
 
   for (const route of routes) {
     const routeParts = route.path.split('/').filter(Boolean);
@@ -423,7 +424,8 @@ export function useRouteParams(currentPath = window.location.pathname) {
 
   // Return an empty object if no matching route is found
   return {};
+  } catch(e) {
+    console.error("useRouteParams error:", e);
+    return {};
+  }
 }
-
-
-export { initializeRouter, renderPage, navigate, useQueryParams };

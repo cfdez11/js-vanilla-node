@@ -97,11 +97,25 @@
     }
   }
 
-  const metadata = {
-    title: "Weather ISR - Server Side Rendering",
-    description:
-      "Weather page with Server-Side Rendering. All data is loaded on the server before sending the page to the client.",
+  async function getMetadata({ req, props }) {
+    const cityName = req.params.city?.toLowerCase() || "madrid";
+
+    const cities = {
+      madrid: "Madrid",
+      barcelona: "Barcelona",
+      londres: "Londres",
+      nuevayork: "Nueva York",
+      paris: "París",
+      tokio: "Tokio",
+    };
+
+    const cityDisplayName = cities[cityName] || "Ciudad Desconocida";
+
+    return {
+      title: `Weather in ${cityDisplayName} ${props.current?.temperature || '-'}°C - Server Side Rendering`,
+      description: `Current weather and forecast for ${cityDisplayName}. Data fetched on the server before rendering.`,
       revalidateSeconds: 10
+    };
   };
 </script>
 <template>
