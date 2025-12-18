@@ -1,6 +1,8 @@
-import * as _page_csr__city from "./_components/_page_csr__city.js";
-import * as _page_csr from "./_components/_page_csr.js";
-import * as _ from "./_components/_.js";
+import * as _not_found_38fcb039 from "./_components/_not_found_38fcb039.js";
+import * as _page_csr_city_3aa0994b from "./_components/_page_csr_city_3aa0994b.js";
+import * as _page_csr_f4051c9e from "./_components/_page_csr_f4051c9e.js";
+import * as _static_de6e0f62 from "./_components/_static_de6e0f62.js";
+import * as _static_with_data_a0acd4a0 from "./_components/_static_with_data_a0acd4a0.js";
 
     
     /**
@@ -28,21 +30,30 @@ import * as _ from "./_components/_.js";
       },
     },
 {
-      path: "/page-csr/:city",
-      component: _page_csr__city.hydrateClientComponent,
+      path: "/not-found",
+      component: _not_found_38fcb039.hydrateClientComponent,
       meta: {
         ssr: false,
         requiresAuth: false,
-        ...(_page_csr__city.metadata || {}),
+        ...(_not_found_38fcb039.metadata || {}),
+      },
+    },
+{
+      path: "/page-csr/:city",
+      component: _page_csr_city_3aa0994b.hydrateClientComponent,
+      meta: {
+        ssr: false,
+        requiresAuth: false,
+        ...(_page_csr_city_3aa0994b.metadata || {}),
       },
     },
 {
       path: "/page-csr",
-      component: _page_csr.hydrateClientComponent,
+      component: _page_csr_f4051c9e.hydrateClientComponent,
       meta: {
         ssr: false,
         requiresAuth: false,
-        ...(_page_csr.metadata || {}),
+        ...(_page_csr_f4051c9e.metadata || {}),
       },
     },
 {
@@ -61,11 +72,27 @@ import * as _ from "./_components/_.js";
     },
 {
       path: "/",
-      component: _.hydrateClientComponent,
+      meta: {
+        ssr: true,
+        requiresAuth: false,
+      },
+    },
+{
+      path: "/static",
+      component: _static_de6e0f62.hydrateClientComponent,
       meta: {
         ssr: false,
         requiresAuth: false,
-        ...(_.metadata || {}),
+        ...(_static_de6e0f62.metadata || {}),
+      },
+    },
+{
+      path: "/static-with-data",
+      component: _static_with_data_a0acd4a0.hydrateClientComponent,
+      meta: {
+        ssr: false,
+        requiresAuth: false,
+        ...(_static_with_data_a0acd4a0.metadata || {}),
       },
     }
     ];

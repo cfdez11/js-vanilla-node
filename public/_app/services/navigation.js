@@ -8,23 +8,6 @@ function findRoute(path) {
   });
 }
 
-function handleClickLink(event, link) {
-  const href = link.getAttribute("href");
-  const routePath = href.split("?")[0];
-  const route = findRoute(routePath);
-
-  if (window.location.pathname === routePath) {
-    event.preventDefault();
-    return;
-  }
-
-  // Client side navigation - SPA
-  if (route && !route.meta?.ssr) {
-    event.preventDefault();
-    navigate(href);
-  }
-}
-
 /**
  * Must be initialized inside a DOMContentLoaded event listener
  */
@@ -33,14 +16,44 @@ export async function initializeRouter() {
     navigate(location.pathname, false);
   });
 
-  document.addEventListener("click", (event) => {
+    document.addEventListener("click", (event) => {
+
     const link = event.target.closest("a");
-    if (link) {
-      handleClickLink(event, link);
+    if (!link) return;
+
+    const href = link.getAttribute("href");
+    if (!href || href.startsWith("#")) return; // Anchors locales
+
+    const url = new URL(href, window.location.origin);
+    const isExternal = url.origin !== window.location.origin;
+    const forceReload = link.dataset.reload !== undefined; // data-reload
+    const doPrefetch = link.dataset.prefetch !== undefined; // data-prefetch
+
+    // Prefetch si aplica
+    if (!isExternal && doPrefetch) {
+      prefetchRoute(url.pathname);
+    }
+
+    // No interceptar si es externo o fuerza recarga
+    if (isExternal || forceReload || link.target === "_blank" || link.rel === "external") {
+      return; // Deja que el navegador haga su trabajo
+    }
+
+    const route = findRoute(routePath);
+
+    if(route && route.meta && !route.meta.ssr) {
+      event.preventDefault();
+      navigate(url.pathname + url.search + url.hash);
     }
   });
 
+  // Navegar a la ruta inicial
   navigate(location.pathname, false);
+}
+
+function prefetchRoute(path) {
+  // Aquí podrías fetch de datos JSON o chunks JS
+  fetch(path + "?json=1");
 }
 
 /**
@@ -104,7 +117,7 @@ export function renderPage(route, path) {
   // render component into marker
   route.component(marker);
 
-  if (route.metadata) {
+  if (route.meta) {
     addMetadata(route.meta);
   }
 
