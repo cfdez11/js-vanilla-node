@@ -445,15 +445,12 @@ export async function saveClientRoutesFile(clientRoutes, clientImports) {
      * @property {string} path
      * @property {string} serverPath
      * @property {boolean} isNotFound
-     * @property {(marker: HTMLElement) => void} [component]
+     * @property {(marker: HTMLElement) => { render: (marker: string) => void, metadata: any}} [component]
      * @property {RouteMeta} meta
      */
   `;
   const clientFileCode = `
-    ${clientImports.map(
-    (i) => `import * as ${i.varName} from "${i.path}";`
-  )
-      .join("\n")}
+    import { loadRouteComponent } from './services/cache.js';
 
     ${commentsClient}
     export const routes = [

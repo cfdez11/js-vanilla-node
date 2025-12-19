@@ -1017,11 +1017,14 @@ async function getRouteFileData(file) {
 
   data.clientRoute = `{
       path: "${urlPath}",
-      component: ${importVar}.hydrateClientComponent,
+      component: async () => {
+        const mod = await loadRouteComponent("${urlPath}", () => import("${importPath}"));
+
+        return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
+      },
       meta: {
         ssr: false,
         requiresAuth: false,
-        ...(${importVar}.metadata || {}),
       },
     }`;
 

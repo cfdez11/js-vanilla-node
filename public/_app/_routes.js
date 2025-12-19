@@ -1,8 +1,4 @@
-import * as _not_found_38fcb039 from "./_components/_not_found_38fcb039.js";
-import * as _page_csr_city_3aa0994b from "./_components/_page_csr_city_3aa0994b.js";
-import * as _page_csr_f4051c9e from "./_components/_page_csr_f4051c9e.js";
-import * as _static_de6e0f62 from "./_components/_static_de6e0f62.js";
-import * as _static_with_data_a0acd4a0 from "./_components/_static_with_data_a0acd4a0.js";
+import { loadRouteComponent } from './services/cache.js';
 
     
     /**
@@ -17,7 +13,7 @@ import * as _static_with_data_a0acd4a0 from "./_components/_static_with_data_a0a
      * @property {string} path
      * @property {string} serverPath
      * @property {boolean} isNotFound
-     * @property {(marker: HTMLElement) => void} [component]
+     * @property {(marker: HTMLElement) => { render: (marker: string) => void, metadata: any}} [component]
      * @property {RouteMeta} meta
      */
   
@@ -31,29 +27,38 @@ import * as _static_with_data_a0acd4a0 from "./_components/_static_with_data_a0a
     },
 {
       path: "/not-found",
-      component: _not_found_38fcb039.hydrateClientComponent,
+      component: async () => {
+        const mod = await loadRouteComponent("/not-found", () => import("./_components/_not_found_38fcb039.js"));
+
+        return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
+      },
       meta: {
         ssr: false,
         requiresAuth: false,
-        ...(_not_found_38fcb039.metadata || {}),
       },
     },
 {
       path: "/page-csr/:city",
-      component: _page_csr_city_3aa0994b.hydrateClientComponent,
+      component: async () => {
+        const mod = await loadRouteComponent("/page-csr/:city", () => import("./_components/_page_csr_city_3aa0994b.js"));
+
+        return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
+      },
       meta: {
         ssr: false,
         requiresAuth: false,
-        ...(_page_csr_city_3aa0994b.metadata || {}),
       },
     },
 {
       path: "/page-csr",
-      component: _page_csr_f4051c9e.hydrateClientComponent,
+      component: async () => {
+        const mod = await loadRouteComponent("/page-csr", () => import("./_components/_page_csr_f4051c9e.js"));
+
+        return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
+      },
       meta: {
         ssr: false,
         requiresAuth: false,
-        ...(_page_csr_f4051c9e.metadata || {}),
       },
     },
 {
@@ -79,20 +84,26 @@ import * as _static_with_data_a0acd4a0 from "./_components/_static_with_data_a0a
     },
 {
       path: "/static",
-      component: _static_de6e0f62.hydrateClientComponent,
+      component: async () => {
+        const mod = await loadRouteComponent("/static", () => import("./_components/_static_de6e0f62.js"));
+
+        return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
+      },
       meta: {
         ssr: false,
         requiresAuth: false,
-        ...(_static_de6e0f62.metadata || {}),
       },
     },
 {
       path: "/static-with-data",
-      component: _static_with_data_a0acd4a0.hydrateClientComponent,
+      component: async () => {
+        const mod = await loadRouteComponent("/static-with-data", () => import("./_components/_static_with_data_a0acd4a0.js"));
+
+        return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
+      },
       meta: {
         ssr: false,
         requiresAuth: false,
-        ...(_static_with_data_a0acd4a0.metadata || {}),
       },
     }
     ];

@@ -1,154 +1,214 @@
 import { routes } from '../_routes.js';
+import { prefetchRouteComponent } from './cache.js';
 
+/**
+ * Finds a route configuration matching a given path.
+ *
+ * Supports both static string paths and RegExp paths.
+ *
+ * @param {string} path - The path to match against the route definitions.
+ * @returns {Object|undefined} The matched route object, or undefined if no match.
+ */
 function findRoute(path) {
   return routes.find((r) => {
-    if (typeof r.path === "string") return r.path === path;
-    if (r.path instanceof RegExp) return path.match(r.path);
+    if (typeof r.path === 'string') return r.path === path;
+    if (r.path instanceof RegExp) return r.path.test(path);
     return false;
   });
 }
 
 /**
- * Must be initialized inside a DOMContentLoaded event listener
+ * Sets up an IntersectionObserver to prefetch route components
+ * for links marked with `data-prefetch` when they enter the viewport.
  */
-export async function initializeRouter() {
-  window.addEventListener("popstate", () => {
-    navigate(location.pathname, false);
-  });
+function setupPrefetchObserver() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      const link = entry.target;
+      if (!link.hasAttribute('data-prefetch')) return;
 
-    document.addEventListener("click", (event) => {
+      const url = new URL(link.href, window.location.origin);
 
-    const link = event.target.closest("a");
-    if (!link) return;
+      const route = routes.find(r => r.path === url.pathname);
 
-    const href = link.getAttribute("href");
-    if (!href || href.startsWith("#")) return; // Anchors locales
+      if (!route?.component) return;
 
-    const url = new URL(href, window.location.origin);
-    const isExternal = url.origin !== window.location.origin;
-    const forceReload = link.dataset.reload !== undefined; // data-reload
-    const doPrefetch = link.dataset.prefetch !== undefined; // data-prefetch
+      prefetchRouteComponent(route.path, route.component);
+      observer.unobserve(link);
+    });
+  }, { rootMargin: '200px' });
 
-    // Prefetch si aplica
-    if (!isExternal && doPrefetch) {
-      prefetchRoute(url.pathname);
-    }
-
-    // No interceptar si es externo o fuerza recarga
-    if (isExternal || forceReload || link.target === "_blank" || link.rel === "external") {
-      return; // Deja que el navegador haga su trabajo
-    }
-
-    const route = findRoute(routePath);
-
-    if(route && route.meta && !route.meta.ssr) {
-      event.preventDefault();
-      navigate(url.pathname + url.search + url.hash);
+  document.querySelectorAll('a[data-prefetch]').forEach((link) => {
+    if (!link.__prefetchObserved) {
+      link.__prefetchObserved = true;
+      observer.observe(link);
     }
   });
-
-  // Navegar a la ruta inicial
-  navigate(location.pathname, false);
-}
-
-function prefetchRoute(path) {
-  // Aquí podrías fetch de datos JSON o chunks JS
-  fetch(path + "?json=1");
 }
 
 /**
- * Adds hydrate-client-components script to the document head
- * @returns {void}
+ * Initializes the SPA router, including:
+ * - Popstate listener for back/forward navigation
+ * - Link interception for client-side routing
+ * - Prefetch observer setup
+ *
+ * Must be called after DOMContentLoaded.
  */
-function addHydrateClientComponentScript() {
-  if (document.querySelector('script[src="/public/_app/services/hydrate-client-components.js"]')) {
-    return;
-  }
+export function initializeRouter() {
+  window.addEventListener('popstate', () => {
+    navigate(location.pathname, false);
+  });
 
-  const hydrateScript = document.createElement("script");
-  hydrateScript.src = "/public/_app/services/hydrate-client-components.js";
-  hydrateScript.type = "module";
-  document.head.appendChild(hydrateScript);
+  setupPrefetchObserver();
+  setupLinkInterceptor();
+
+  // Perform initial navigation
+  navigate(location.pathname, false);
 }
 
-const addMetadata = (metadata) => {
+/**
+ * Sets up click interception on internal links to perform SPA navigation
+ * instead of full page reloads.
+ *
+ * Links with `data-reload`, `_blank`, `rel="external"` or external URLs
+ * are ignored.
+ */
+function setupLinkInterceptor() {
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a');
+    if (!link) return;
+
+    const href = link.getAttribute('href');
+    
+    if (!href || href.startsWith('#')) return;
+
+    const url = new URL(href, window.location.origin);
+    const isExternal = url.origin !== window.location.origin;
+    const forceReload = link.dataset.reload !== undefined;
+
+    if (
+      isExternal ||
+      forceReload ||
+      link.target === '_blank' ||
+      link.rel === 'external'
+    ) {
+      return;
+    }
+
+    const routePath = url.pathname;
+    const route = findRoute(routePath);
+
+    if (route?.meta?.ssr) return;
+
+    event.preventDefault();
+    navigate(url.pathname + url.search + url.hash);
+  });
+}
+
+/**
+ * Injects route metadata (title, description) into the document head.
+ *
+ * @param {Object} metadata - The route metadata.
+ * @param {string} [metadata.title] - Page title to set.
+ * @param {string} [metadata.description] - Page description meta tag.
+ */
+
+function addMetadata(metadata) {
   if (metadata.title) {
     document.title = metadata.title;
   }
+
   if (metadata.description) {
     let descriptionMeta = document.querySelector('meta[name="description"]');
+
     if (!descriptionMeta) {
-      descriptionMeta = document.createElement("meta");
-      descriptionMeta.name = "description";
+      descriptionMeta = document.createElement('meta');
+      descriptionMeta.name = 'description';
       document.head.appendChild(descriptionMeta);
     }
+
     descriptionMeta.content = metadata.description;
   }
 }
 
 /**
- * 
- * @param {{
- * path: string,
- * meta: { ssr: boolean, requiresAuth: false, [key: string]: any }
- * }} route 
- * @param {string} path 
- * @returns {void}
+ * Ensures the client hydration script is injected into the head,
+ * avoiding duplicate script insertion.
  */
-export function renderPage(route, path) {
-  const main = document.querySelector("main");
-
-  if (!route || !route.component) {
+function addHydrateClientComponentScript() {
+  if (
+    document.querySelector(
+      'script[src="/public/_app/services/hydrate-client-components.js"]'
+    )
+  ) {
     return;
   }
 
-  // Get regex matches for dynamic routes
-  let params = [];
-  if (route.path instanceof RegExp) {
-    const match = path.match(route.path);
-    params = match ? match.slice(1) : [];
-  }
+  const script = document.createElement('script');
+  script.src = '/public/_app/services/hydrate-client-components.js';
+  script.type = 'module';
+  document.head.appendChild(script);
+}
 
-  // create template marker
-  main.innerHTML = "";
-  const marker = document.createElement("template");
+/**
+ * Renders a route component into the main container.
+ *
+ * @param {Object} route - The route object.
+ * @param {string} path - The route path.
+ * @returns {Promise<void>}
+ */
+export async function renderPage(route, path) {
+  if (!route?.component) return;
+
+  const { hydrateClientComponent, metadata } = await route.component();
+
+  if(!hydrateClientComponent) return;
+
+  const main = document.querySelector('main');
+  if (!main) return;
+
+  main.innerHTML = '';
+
+  const marker = document.createElement('template');
   main.appendChild(marker);
 
-  // render component into marker
-  route.component(marker);
-
-  if (route.meta) {
-    addMetadata(route.meta);
+  hydrateClientComponent(marker);
+  
+  if (metadata) {
+    addMetadata(metadata);
   }
 
   addHydrateClientComponentScript();
 }
 
 /**
- * Redirect user a new page page by path, with optional history addition
- * @param {string} path 
- * @param {boolean} addToHistory 
- * @returns {void}
+ * Navigates to a given path using SPA behavior for CSR routes.
+ * Performs history push and renders the page component.
+ *
+ * @param {string} path - The target route path.
+ * @param {boolean} [addToHistory=true] - Whether to push to history stack.
  */
-export function navigate(path, addToHistory = true) {
-  const routePath = path.split("?")[0];
+export async function navigate(path, addToHistory = true) {
+  const routePath = path.split('?')[0];
   const route = findRoute(routePath);
 
-  // Skip SSR routes
-  if (route?.meta?.ssr) return;
+  if (route?.meta?.ssr) {
+    // todo: to avoid clear all scripts cache, fetch the html and replace only <main> content and metadata
+    return;
+  };
 
   if (addToHistory) {
-    history.pushState({}, "", path);
+    history.pushState({}, '', path);
   }
 
-  // Auth checks
   if (route?.meta?.requiresAuth && !app.Store?.loggedIn) {
-    navigate("/account/login");
+    navigate('/account/login');
     return;
   }
 
   if (route?.meta?.accessOnly && app.Store?.loggedIn) {
-    navigate("/account");
+    navigate('/account');
     return;
   }
 
