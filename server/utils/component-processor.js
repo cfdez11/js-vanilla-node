@@ -586,8 +586,8 @@ export async function generateClientComponentModule({
   // Convert template
   const convertedTemplate = convertVueToHtmlTagged(template, clientCodeWithProps);
 
-  const { html: processedHtml } = await renderComponents({ 
-    html: convertedTemplate, 
+  const { html: processedHtml } = await renderComponents({
+    html: convertedTemplate,
     clientComponents,
   });
 
@@ -656,17 +656,17 @@ function getIfPageCanCSR(revalidate, hasServerComponents, hasGetData) {
  * }>>}
  */
 export async function generateServerComponentHTML(componentPath) {
-  const { 
-    getStaticPaths, 
-    getData, 
-    getMetadata, 
-    serverComponents, 
+  const {
+    getStaticPaths,
+    getData,
+    getMetadata,
+    serverComponents,
     ...restProcessHtmlFile
   } = await processHtmlFile(componentPath);
-  
+
   const metadata = getMetadata ? await getMetadata({ req: { params: {} }, props: {} }) : null;
   const canCSR = getIfPageCanCSR(
-    metadata?.revalidate, 
+    metadata?.revalidate,
     serverComponents.size > 0,
     typeof getData === "function"
   );
@@ -677,18 +677,18 @@ export async function generateServerComponentHTML(componentPath) {
     htmls: [],
     canCSR,
     metadata,
-    getStaticPaths, 
-    getData, 
-    getMetadata, 
-    serverComponents, 
+    getStaticPaths,
+    getData,
+    getMetadata,
+    serverComponents,
     ...restProcessHtmlFile,
   };
 
   // If no static paths and getData exists, render once with empty params
   if (paths.length === 0 && !!getData) {
-    const { 
-      html, 
-      pageHtml, 
+    const {
+      html,
+      pageHtml,
       metadata: pageMetadata,
     } =
       await renderPageWithLayout(componentPath, {}, true);
@@ -825,6 +825,49 @@ function addComputedProps(clientCode, componentProps) {
   );
 }
 
+async function getMetadataAndStaticPaths(getMetadata, getStaticPaths) {
+  const promises = [];
+
+  if (getMetadata) {
+    promises.push(getMetadata({ req: { params: {} }, props: {} }));
+  }
+  if (getStaticPaths) {
+    promises.push(getStaticPaths());
+  }
+
+  const [metadata, paths] = await Promise.all(promises);
+
+  return {
+    metadata: metadata || DEFAULT_METADATA,
+    paths: paths || [],
+  };
+};
+
+/**
+ * Replaces route parameters with the provided values.
+ *
+ * This function takes a route that may contain multiple parameters in the `:param` format
+ * and replaces them with the corresponding values from the `params` object.
+ *
+ * @example
+ * // Route with multiple parameters
+ * fillRoute("/user/:userId/post/:postId", { userId: 123, postId: 456 });
+ * // Returns: "/user/123/post/456"
+ *
+ * @param {string} route - The route containing `:param` placeholders.
+ * @param {Record<string, string|number>} params - An object with values to replace in the route.
+ * @throws {Error} Throws an error if any parameter in the route is missing in `params`.
+ * @returns {string} The final route with all parameters replaced.
+ */
+function fillRoute(route, params) {
+  return route.replace(/:([a-zA-Z0-9_]+)/g, (_, key) => {
+    if (params[key] === undefined) {
+      throw new Error(`Missing parameter "${key}"`);
+    }
+    return params[key];
+  });
+}
+
 /**
  * Generates and persists either:
  * - Server-rendered HTML (SSG / ISR) for a component, or
@@ -857,46 +900,46 @@ async function generateComponentAndFillCache(filePath) {
     clientComponents,
   } = await generateServerComponentHTML(filePath);
 
-    if (serverHtmls.length) {
-      for (const { params, html, pageHtml, metadata: pageMetadata } of serverHtmls) {
-        // save server HTML in cache
-        const paramsValues = params ? Object.values(params): [];
-        const cacheKey = `${urlPath}${paramsValues.length ? `_${paramsValues.join("_")}` : ""}`;
-        saveComponentHtmlDisk({ componentPath: cacheKey, html });
+  if (serverHtmls.length) {
+    for (const { params, html, pageHtml, metadata: pageMetadata } of serverHtmls) {
+      // save server HTML in cache
+      const cacheKey = fillRoute(urlPath, params);
+      // const cacheKey = `${urlPath}${paramsValues.length ? `_${paramsValues.join("_")}` : ""}`;
+      saveComponentHtmlDisk({ componentPath: cacheKey, html });
 
-        if(canCSR) {
-          const jsModuleCode = await generateClientComponentModule({
-            metadata: pageMetadata,
-            clientCode,
-            template: pageHtml,
-            clientImports,
-            clientComponents,
-          });
+      if (canCSR) {
+        const jsModuleCode = await generateClientComponentModule({
+          metadata: pageMetadata,
+          clientCode,
+          template: pageHtml,
+          clientImports,
+          clientComponents,
+        });
 
-          if (jsModuleCode) {
-            const componentName = generateComponentId(urlPath);
-            await saveClientComponentModule(componentName, jsModuleCode)
-          }
+        if (jsModuleCode) {
+          const componentName = generateComponentId(cacheKey);
+          await saveClientComponentModule(componentName, jsModuleCode)
         }
       }
     }
-      
-    if(canCSR && serverHtmls.length === 0) {
-      const jsModuleCode = await generateClientComponentModule({
-        metadata,
-        clientCode,
-        template: template,
-        clientImports,
-        clientComponents,
-      });
+  }
 
-      if (jsModuleCode) {
-        const componentName =  generateComponentId(urlPath);
-        await saveClientComponentModule(componentName, jsModuleCode)
-      }
+  if (canCSR && serverHtmls.length === 0) {
+    const jsModuleCode = await generateClientComponentModule({
+      metadata,
+      clientCode,
+      template: template,
+      clientImports,
+      clientComponents,
+    });
+
+    if (jsModuleCode) {
+      const componentName = generateComponentId(urlPath);
+      await saveClientComponentModule(componentName, jsModuleCode)
     }
+  }
 
-    return 'Client component generated';
+  return 'Client component generated';
 }
 
 /**
@@ -951,82 +994,107 @@ export async function generateComponentsAndFillCache() {
  * Page file descriptor.
  *
  * @returns {Promise<{
- *   serverRoute: string | null,
- *   clientRoute: string | null,
- *   clientImport: {
- *     varName: string,
- *     path: string
- *   } | null
+ *   serverRoutes: Array<{
+ *     path: string,
+ *     serverPath: string,
+ *     isNotFound: boolean,
+ *     meta: {
+ *       ssr: boolean,
+ *       requiresAuth: boolean,
+ *       revalidate: number | string
+ *     }
+ *   }>,
+ *   clientRoutes: Array<{
+ *     path: string,
+ *     component?: Function,
+ *     meta: {
+ *       ssr: boolean,
+ *       requiresAuth: boolean,
+ *     }
+ *   }>,
  * }>}
  * Route configuration data used to generate routing files.
  */
 async function getRouteFileData(file) {
   const data = {
-    serverRoute: null,
-    clientRoute: null,
-    clientImport: null,
+    serverRoutes: [],
+    clientRoutes: [],
   }
-  const { getData, getMetadata, serverComponents } = await processHtmlFile(file.fullpath);
+  const { getData, getMetadata, getStaticPaths, serverComponents } = await processHtmlFile(file.fullpath);
 
   const filePath = getOriginalRoutePath(file.fullpath);
   const urlPath = getRoutePath(file.fullpath);
 
-  const metadataPage = getMetadata
-    ? await getMetadata({ req: { params: {} }, props: {} }) || DEFAULT_METADATA
-    : DEFAULT_METADATA;
+  const { metadata, paths } = await getMetadataAndStaticPaths(getMetadata, getStaticPaths);
+
 
   const canCSR = getIfPageCanCSR(
-    metadataPage?.revalidate, 
+    metadata?.revalidate,
     serverComponents.size > 0,
     typeof getData === "function"
   );
 
-  data.serverRoute = `{
+  data.serverRoutes.push(`{
     path: "${filePath}",
     serverPath: "${urlPath}",
     isNotFound: ${file.path.includes("/not-found/")},
     meta: {
       ssr: ${!canCSR},
       requiresAuth: false,
-      revalidate: "${metadataPage?.revalidate ?? 0}" ,
+      revalidate: "${metadata?.revalidate ?? 0}" ,
     },
-  }`;
+  }`);
 
 
   if (!canCSR) {
-    data.clientRoute = `{
+    data.clientRoutes.push(`{
       path: "${urlPath}",
       meta: {
         ssr: true,
         requiresAuth: false,
       },
-    }`;
+    }`);
 
     return data;
   }
 
-  const componentName = generateComponentId(urlPath);
+  // if is static page with paths, create route for each path
+  if (paths.length > 0) {
+    for (const pathObj of paths) {
+      const filledPath = fillRoute(urlPath, pathObj.params);
+      const componentName = generateComponentId(filledPath);
+      const importPath = `./_components/${componentName}.js`;
 
-  const importVar = componentName;
-  const importPath = `./_components/${componentName}.js`;
+      data.clientRoutes.push(`{
+        path: "${filledPath}",
+        component: async () => {
+          const mod = await loadRouteComponent("${filledPath}", () => import("${importPath}"));
 
-  data.clientImport = {
-    varName: importVar,
-    path: importPath,
-  };
+          return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
+        },
+        meta: {
+          ssr: false,
+          requiresAuth: false,
+        },
+      }`);
+    }
+  } else {
+    const componentName = generateComponentId(urlPath);
+    const importPath = `./_components/${componentName}.js`;
 
-  data.clientRoute = `{
+    data.clientRoutes.push(`{
       path: "${urlPath}",
       component: async () => {
         const mod = await loadRouteComponent("${urlPath}", () => import("${importPath}"));
-
+        
         return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
-      },
+        },
       meta: {
         ssr: false,
         requiresAuth: false,
       },
-    }`;
+    }`);
+  }
 
   return data;
 }
@@ -1063,7 +1131,6 @@ export async function generateRoutes() {
   const pageFiles = await getPageFiles()
 
   const serverRoutes = [];
-  const clientImports = [];
   const clientRoutes = [];
 
   const routeFilesPromises = pageFiles.map((pageFile) => getRouteFileData(pageFile))
@@ -1071,24 +1138,20 @@ export async function generateRoutes() {
 
   for (const routeFile of routeFiles) {
     const {
-      serverRoute,
-      clientRoute,
-      clientImport
+      serverRoutes: serverRoutesFile,
+      clientRoutes: clientRoutesFile,
     } = routeFile;
 
-    if (serverRoute) {
-      serverRoutes.push(serverRoute);
+    if (serverRoutesFile?.length) {
+      serverRoutes.push(...serverRoutesFile);
     }
-    if (clientRoute) {
-      clientRoutes.push(clientRoute);
-    }
-    if (clientImport) {
-      clientImports.push(clientImport);
+    if (clientRoutesFile?.length) {
+      clientRoutes.push(...clientRoutesFile);
     }
   }
 
   await Promise.all([
-    saveClientRoutesFile(clientRoutes, clientImports),
+    saveClientRoutesFile(clientRoutes),
     saveServerRoutesFile(serverRoutes),
   ]);
 

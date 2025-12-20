@@ -1,56 +1,87 @@
-// Hydrates a single component marker
-async function hydrateMarker(marker) {
-  if (marker.dataset.hydrated === "true") return;
-
-  const componentName = marker.getAttribute("data-client:component");
-
-  try {
-    const module = await import(`/public/_app/_components/${componentName}.js`);
-    module.hydrateClientComponent(marker);
-    marker.dataset.hydrated = "true";
-  } catch (error) {
-    console.error(`Failed to load component: ${componentName}`, error);
-  }
-}
-
-// Hydrates all component markers
-async function hydrateComponents(container = document) {
-  const markers = container.querySelectorAll(
-    "[data-client\\:component]:not([data-hydrated='true'])"
-  );
-
-  for (const marker of markers) {
-    await hydrateMarker(marker);
-  }
-}
-
 /**
-  Important: use observer before DOMContentLoaded because if the page response is not ended because there are streaming components, the document might not fire DOMContentLoaded event. So we need to observe from the start to hydrate client components as they are added.
- **/ 
-const observer = new MutationObserver((mutations) => {
-  mutations.forEach((mutation) => {
-    mutation.addedNodes.forEach((node) => {
-      if (node.nodeType === 1) {
-        if (node.matches?.("[data-client\\:component]")) {
-          hydrateMarker(node);
-        }
-        const markers = node.querySelectorAll?.(
-          '[data-client\\:component]:not([data-hydrated="true"])'
-        );
-        markers?.forEach(hydrateMarker);
+ * Client-side component hydration script.
+ *
+ * This script automatically hydrates all components marked with
+ * `data-client:component` in the DOM. It supports:
+ *   - Initial hydration on page load
+ *   - Progressive hydration for streaming SSR content
+ *   - SPA updates by exposing a global `window.hydrateComponents` function
+ *
+ * Each component module is dynamically imported, and its exported
+ * `hydrateClientComponent` function is called with the component marker.
+ */
+(function () {
+
+  /**
+   * Hydrates a single component marker.
+   *
+   * This function checks if the marker is already hydrated via the
+   * `data-hydrated` attribute to avoid rehydration. It dynamically imports
+   * the component module and calls its `hydrateClientComponent` function.
+   *
+   * @param {HTMLElement} marker - The <template> or marker element representing a client component.
+   */
+  async function hydrateMarker(marker) {
+    if (marker.dataset.hydrated === "true") return;
+    marker.dataset.hydrated = "true";
+
+    const componentName = marker.getAttribute("data-client:component");
+
+    try {
+      const module = await import(`/public/_app/_components/${componentName}.js`);
+      await module.hydrateClientComponent(marker);
+    } catch (error) {
+      console.error(`Failed to load component: ${componentName}`, error);
+    }
+  }
+
+  /**
+   * Hydrates all unhydrated component markers inside a container.
+   *
+   * @param {HTMLElement|Document} [container=document] - The root container to scan for components.
+   */
+  async function hydrateComponents(container = document) {
+    const markers = container.querySelectorAll(
+      "[data-client\\:component]:not([data-hydrated='true'])"
+    );
+
+    for (const marker of markers) {
+      await hydrateMarker(marker);
+    }
+  }
+
+  /**
+   * MutationObserver callback for progressive hydration.
+   *
+   * Observes DOM mutations and hydrates newly added components dynamically.
+   */
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node.nodeType !== 1) continue; // Only element nodes
+        if (node.matches?.("[data-client\\:component]")) hydrateMarker(node);
+        hydrateComponents(node);
       }
+    }
+  });
+
+  // Start observing the document for new nodes
+  observer.observe(document, { childList: true, subtree: true });
+
+  // Hydrate existing components on DOMContentLoaded or immediately if already interactive
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      hydrateComponents();
+      observer.disconnect();
     });
-  });
-});
-
-// start observing the document for added nodes until DOMContentLoaded
-observer.observe(document, { childList: true, subtree: true });
-
-// hydrate on DOMContentLoaded and unobserve after that
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => {
+  } else {
     hydrateComponents();
-  });
-} else {
-  hydrateComponents();
-}
+  }
+
+  /**
+   * Expose `hydrateComponents` globally so it can be called manually
+   * for SPA navigations or dynamically rendered content.
+   * @type {function(HTMLElement|Document): Promise<void>}
+   */
+  window.hydrateComponents = hydrateComponents;
+})();

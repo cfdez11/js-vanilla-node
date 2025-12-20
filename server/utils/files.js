@@ -421,17 +421,14 @@ export async function saveServerRoutesFile(serverRoutes) {
  *
  * Includes:
  * - Route definitions
- * - Client component imports
  *
  * @async
  * @param {string[]} clientRoutes
  * Serialized client route objects.
- *
- * @param {Array<{ varName: string, path: string }>} clientImports
- *
+ * *
  * @returns {Promise<void>}
  */
-export async function saveClientRoutesFile(clientRoutes, clientImports) {
+export async function saveClientRoutesFile(clientRoutes) {
   const commentsClient = `
     /**
      * @typedef {Object} RouteMeta

@@ -59,9 +59,9 @@
     serverPath: "/page-ssr/:city",
     isNotFound: false,
     meta: {
-      ssr: true,
+      ssr: false,
       requiresAuth: false,
-      revalidate: "10" ,
+      revalidate: "never" ,
     },
   },
 {

@@ -1,5 +1,6 @@
 import { routes } from '../_routes.js';
 import { prefetchRouteComponent } from './cache.js';
+import { updateRouteParams } from './useRouteParams.js';
 
 /**
  * Finds a route configuration matching a given path.
@@ -131,25 +132,6 @@ function addMetadata(metadata) {
 }
 
 /**
- * Ensures the client hydration script is injected into the head,
- * avoiding duplicate script insertion.
- */
-function addHydrateClientComponentScript() {
-  if (
-    document.querySelector(
-      'script[src="/public/_app/services/hydrate-client-components.js"]'
-    )
-  ) {
-    return;
-  }
-
-  const script = document.createElement('script');
-  script.src = '/public/_app/services/hydrate-client-components.js';
-  script.type = 'module';
-  document.head.appendChild(script);
-}
-
-/**
  * Renders a route component into the main container.
  *
  * @param {Object} route - The route object.
@@ -177,17 +159,20 @@ export async function renderPage(route, path) {
     addMetadata(metadata);
   }
 
-  addHydrateClientComponentScript();
+  hydrateComponents(); // global function from hydrate-client-components.js
 }
 
 /**
  * Navigates to a given path using SPA behavior for CSR routes.
  * Performs history push and renders the page component.
  *
+ * Updates route params store on navigation.
  * @param {string} path - The target route path.
  * @param {boolean} [addToHistory=true] - Whether to push to history stack.
  */
 export async function navigate(path, addToHistory = true) {
+  updateRouteParams(path);
+
   const routePath = path.split('?')[0];
   const route = findRoute(routePath);
 
@@ -242,6 +227,7 @@ async function renderSSRPage(path) {
     htmlBuffer = processSSRTemplates(htmlBuffer, parser);
     htmlBuffer = processSSRScripts(htmlBuffer, parser);
     updateSSRMetadata(htmlBuffer, parser);
+    hydrateComponents(); // global function from hydrate-client-components.js
   }
 }
 

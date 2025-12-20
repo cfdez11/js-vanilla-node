@@ -372,12 +372,13 @@ Future features planned for implementation:
 - [x] **Unify** - Same constants files, unify fs functions in files, unify comments, etc
 - [x] **Cache getData** - Implement caching layer for data fetching functions
 - [x] **Cache Server Pages** - Cache rendered server pages for improved performance
-- [ ] **Link Component** - Custom link component with prefetching capabilities
-- [ ] **Prefetch Pages** - Automatically prefetch pages on link hover/visibility
+- [x] **Link Component** - Custom link component with prefetching capabilities
+- [x] **Prefetch Pages** - Automatically prefetch pages on link hover/visibility
 - [ ] **Restructure Directories** - Optimize project structure and organization
 - [ ] **Authentication** - Built-in authentication system with middleware support
 - [ ] **Auto-generated Files** - Automatic generation of routes, utility files, and configurations based on code and pages directories
-- [ ] **Optimize auto generated routes** - use promise all
+- [ ] **Custom file** - custom extension to have correct imports, lint, colors, etc. 
+- [ ] **Optimize auto generated routes**
 - [ ] **Layouts** - Layouts inside sub routes
 - [ ] **Regeneration in background** - Regenerate page after send response (locks)
 - [ ] **Cache with CDN** 
