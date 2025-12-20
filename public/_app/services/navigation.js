@@ -63,7 +63,10 @@ export function initializeRouter() {
   setupPrefetchObserver();
   setupLinkInterceptor();
 
-  // Perform initial navigation
+  // Perform initial navigation if is not SSR
+  const route = findRoute(location.pathname);
+  if (route?.meta?.ssr) return;
+  
   navigate(location.pathname, false);
 }
 
@@ -96,13 +99,8 @@ function setupLinkInterceptor() {
       return;
     }
 
-    const routePath = url.pathname;
-    const route = findRoute(routePath);
-
-    if (route?.meta?.ssr) return;
-
     event.preventDefault();
-    navigate(url.pathname + url.search + url.hash);
+    navigate(url.pathname);
   });
 }
 
@@ -193,14 +191,14 @@ export async function navigate(path, addToHistory = true) {
   const routePath = path.split('?')[0];
   const route = findRoute(routePath);
 
-  if (route?.meta?.ssr) {
-    // todo: to avoid clear all scripts cache, fetch the html and replace only <main> content and metadata
-    return;
-  };
-
   if (addToHistory) {
     history.pushState({}, '', path);
   }
+
+  if (route?.meta?.ssr) {
+    await renderSSRPage(path);
+    return;
+  };
 
   if (route?.meta?.requiresAuth && !app.Store?.loggedIn) {
     navigate('/account/login');
@@ -214,6 +212,167 @@ export async function navigate(path, addToHistory = true) {
 
   renderPage(route, routePath);
 }
+
+/**
+ * Fetches an SSR page via streaming and progressively updates the DOM.
+ * @async
+ * @param {string} path - The URL/path of the SSR page to fetch.
+ * @throws {Error} If the response body is not readable or the <main> element is missing.
+ */
+async function renderSSRPage(path) {
+  const response = await fetch(path);
+  if (!response.body) throw new Error('Invalid response body');
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let htmlBuffer = '';
+
+  const mainEl = document.querySelector('main');
+  if (!mainEl) throw new Error('<main> element not found');
+
+  const parser = new DOMParser();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    htmlBuffer += decoder.decode(value, { stream: true });
+
+    htmlBuffer = processSSRMain(htmlBuffer, parser, mainEl);
+    htmlBuffer = processSSRTemplates(htmlBuffer, parser);
+    htmlBuffer = processSSRScripts(htmlBuffer, parser);
+    updateSSRMetadata(htmlBuffer, parser);
+  }
+}
+
+/**
+ * Processes a <main> element from the buffer and updates the DOM.
+ * @param {string} buffer - Current HTML buffer.
+ * @param {DOMParser} parser - DOMParser instance.
+ * @param {HTMLElement} mainEl - The <main> element to update.
+ * @returns {string} Remaining HTML buffer after processing.
+ */
+function processSSRMain(buffer, parser, mainEl) {
+  const mainMatch = buffer.match(/<main[\s\S]*?<\/main>/i);
+  if (mainMatch) {
+    const mainDoc = parser.parseFromString(mainMatch[0], 'text/html');
+    const newMain = mainDoc.querySelector('main');
+
+    if (newMain) {
+      mainEl.innerHTML = newMain.innerHTML;
+    }
+
+    return buffer.slice(mainMatch.index + mainMatch[0].length);
+  }
+
+  return buffer;
+}
+
+/**
+ * Processes <template> elements from the buffer and injects into the DOM.
+ * @param {string} buffer - Current HTML buffer.
+ * @param {DOMParser} parser - DOMParser instance.
+ * @returns {string} Remaining HTML buffer after processing.
+ */
+function processSSRTemplates(buffer, parser) {
+  const templateRegex = /<template[\s\S]*?<\/template>/gi;
+  let match;
+  while ((match = templateRegex.exec(buffer)) !== null) {
+    const tempDoc = parser.parseFromString(match[0], 'text/html').querySelector('template');
+    if (tempDoc && !document.getElementById(tempDoc.id)) {
+      document.body.appendChild(tempDoc.cloneNode(true));
+    }
+  }
+  const closeTemplateTag = '</template>';
+  const lastIndex = buffer.lastIndexOf(closeTemplateTag);
+  if (lastIndex !== -1) {
+    return buffer.slice(lastIndex + closeTemplateTag.length);
+  }
+  return buffer;
+}
+
+/**
+ * Processes <script> elements from the buffer, executes inline scripts, and injects external scripts.
+ * @param {string} buffer - Current HTML buffer.
+ * @param {DOMParser} parser - DOMParser instance.
+ * @returns {string} Remaining HTML buffer after processing.
+ */
+function processSSRScripts(buffer, parser) {
+  const scriptRegex = /<script[\s\S]*?<\/script>/gi;
+  let match;
+  while ((match = scriptRegex.exec(buffer)) !== null) {
+    const scriptEl = parser.parseFromString(match[0], 'text/html').querySelector('script');
+    if (!scriptEl) continue;
+
+    // Hydration scripts for Suspense
+    if (scriptEl.dataset.target && scriptEl.dataset.source) {
+      const targetId = scriptEl.dataset.target;
+      const sourceId = scriptEl.dataset.source;
+      const existScript = document.querySelector(`script[data-target="${targetId}"][data-source="${sourceId}"]`);
+      
+      if (!existScript) {
+        const newScript = document.createElement('script');
+        Object.keys(scriptEl.dataset).forEach(k => newScript.dataset[k] = scriptEl.dataset[k]);
+        newScript.src = scriptEl.src;
+        newScript.async = true;
+        const templateEl = document.getElementById(sourceId);
+        if (templateEl) {
+          templateEl.after(newScript);
+        } else {
+          document.body.appendChild(newScript);
+        }
+      }
+    }
+    // External scripts
+    else if (scriptEl.src) {
+      const srcPath = new URL(scriptEl.src, window.location.origin).pathname;
+      if (!Array.from(document.scripts).some(s => new URL(s.src, window.location.origin).pathname === srcPath)) {
+        const newScript = document.createElement('script');
+        newScript.src = scriptEl.src;
+        newScript.async = true;
+        document.head.appendChild(newScript);
+      }
+    }
+    // Inline scripts
+    else {
+      try { 
+        new Function(scriptEl.textContent)(); 
+      } catch (e) { 
+        console.error('Error executing inline script:', e); 
+      }
+    }
+  }
+
+  const lastIndex = buffer.lastIndexOf('</script>');
+  if (lastIndex !== -1) return buffer.slice(lastIndex + 9);
+  return buffer;
+}
+
+/**
+ * Updates document <title> and <meta name="description"> if present in the buffer.
+ * @param {string} buffer - Current HTML buffer.
+ * @param {DOMParser} parser - DOMParser instance.
+ */
+function updateSSRMetadata(buffer, parser) {
+  const tempDoc = parser.parseFromString(buffer, 'text/html');
+
+  const titleEl = tempDoc.querySelector('title');
+  if (titleEl) {
+    document.title = titleEl.textContent;
+  }
+
+  const metaDesc = tempDoc.querySelector('meta[name="description"]');
+  if (metaDesc) {
+    let meta = document.querySelector('meta[name="description"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'description';
+      document.head.appendChild(meta);
+    }
+    meta.content = metaDesc.content;
+  }
+}
+
 
 /**
  * Parses the URL search string into a plain object.
