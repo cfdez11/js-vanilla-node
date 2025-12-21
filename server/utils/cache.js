@@ -18,7 +18,7 @@ import { getComponentHtmlDisk, markComponentHtmlStale, saveComponentHtmlDisk } f
  *    - `isStale`: True if the cache is stale or explicitly invalidated, false otherwise.
  */
 export async function getCachedComponentHtml({ componentPath, revalidateSeconds = 0 }) {
-  const { html, meta} =  await getComponentHtmlDisk({ componentPath, revalidateSeconds });
+  const { html, meta } =  await getComponentHtmlDisk({ componentPath, revalidateSeconds });
 
   if (!html) {
     return { html: null };

@@ -278,7 +278,7 @@ export async function handlePageRequest(req, res, route) {
 
 
 /**
- * Express route handler to mark a cached component or page as stale for ISR-like revalidation.
+ * Handler to mark a cached component or page as stale for ISR-like revalidation.
  *
  * This endpoint allows clients to request that the server invalidate the cached HTML
  * of a specific component or page. The cache will be regenerated automatically
