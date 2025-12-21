@@ -1,0 +1,16 @@
+<script server>
+  const getData = ({ userId }) => {
+    return {
+      id: userId,
+      name: `User ${userId}`
+    };
+  };
+
+</script>
+
+<template>
+  <div class="user-card">
+    <strong>Usuario:</strong> {{id}}
+    <div>Nombre: {{name}}</div>
+  </div>
+</template>

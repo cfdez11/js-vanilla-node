@@ -1,7 +1,7 @@
 <script server>
-  import UserCard from "server/components/user-card.html";
-  import UserCardDelayed from "server/components/user-card-delayed.html";
-  import UserCardSkeleton from "server/components/user-card-skeleton.html";
+  import UserCard from "components/user-card.html";
+  import UserCardDelayed from "components/user-card-delayed.html";
+  import UserCardSkeleton from "components/user-card-skeleton.html";
 
   async function getData () {
     return { userId: 123, name: "Alice", attributes: ["admin", "editor"] };
@@ -14,7 +14,7 @@
 </script>
 
 <script client>
-  import Counter from "server/components/counter.html";
+  import Counter from "components/counter.html";
 </script>
 
 <template>
