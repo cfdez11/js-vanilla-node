@@ -13,7 +13,7 @@ await initializeDirectories();
 console.warn("Starting server..." + new Date().toISOString());
 
 // Pre-generate all client and server components to have their import statements ready
-await generateComponentsAndFillCache();
+generateComponentsAndFillCache();
 console.warn("Components generated." + new Date().toISOString());
 
 // generate routes automatically

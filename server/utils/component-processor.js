@@ -867,6 +867,45 @@ function fillRoute(route, params) {
     return params[key];
   });
 }
+/**
+ * 
+ * Generates js module and save it in public directory.
+ * 
+ * @param {{
+ *  metadata: object,
+ *  clientCode: string,
+ *  template: string,
+ *  clientImports: Record<string, {
+ *    fileUrl: string,
+ *    originalPath: string,
+ *    importStatement: string
+ * }>,
+ *  clientComponents: Record<string, any>,
+ *  componentName: string,
+ * }} 
+ * 
+ * @returns {Promise<void>}
+ */
+async function saveClientComponent({
+  metadata,
+  clientCode,
+  template,
+  clientImports,
+  clientComponents,
+  componentName,
+}) {
+  const jsModuleCode = await generateClientComponentModule({
+    metadata,
+    clientCode,
+    template,
+    clientImports,
+    clientComponents,
+  });
+
+  if (jsModuleCode) {
+    await saveClientComponentModule(componentName, jsModuleCode)
+  }
+}
 
 /**
  * Generates and persists either:
@@ -899,47 +938,42 @@ async function generateComponentAndFillCache(filePath) {
     clientCode,
     clientComponents,
   } = await generateServerComponentHTML(filePath);
+  
+  const saveServerHtmlsPromises = [];
+  const saveClientHtmlPromises = [];
 
   if (serverHtmls.length) {
     for (const { params, html, pageHtml, metadata: pageMetadata } of serverHtmls) {
-      // save server HTML in cache
       const cacheKey = fillRoute(urlPath, params);
-      // const cacheKey = `${urlPath}${paramsValues.length ? `_${paramsValues.join("_")}` : ""}`;
-      saveComponentHtmlDisk({ componentPath: cacheKey, html });
+      saveServerHtmlsPromises.push(saveComponentHtmlDisk({ componentPath: cacheKey, html }));
 
       if (canCSR) {
-        const jsModuleCode = await generateClientComponentModule({
+        saveServerHtmlsPromises.push(saveClientComponent({
           metadata: pageMetadata,
           clientCode,
           template: pageHtml,
           clientImports,
           clientComponents,
-        });
-
-        if (jsModuleCode) {
-          const componentName = generateComponentId(cacheKey);
-          await saveClientComponentModule(componentName, jsModuleCode)
-        }
+          componentName: generateComponentId(cacheKey),
+        }))
       }
     }
   }
 
   if (canCSR && serverHtmls.length === 0) {
-    const jsModuleCode = await generateClientComponentModule({
+    saveClientHtmlPromises.push(saveClientComponent({
       metadata,
       clientCode,
-      template: template,
+      template,
       clientImports,
       clientComponents,
-    });
-
-    if (jsModuleCode) {
-      const componentName = generateComponentId(urlPath);
-      await saveClientComponentModule(componentName, jsModuleCode)
-    }
+      componentName: generateComponentId(urlPath),
+    }))
   }
 
-  return 'Client component generated';
+  await Promise.all([...saveServerHtmlsPromises, ...saveClientHtmlPromises]);
+
+  return 'Component generated';
 }
 
 /**
