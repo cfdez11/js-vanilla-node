@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { handlePageRequest } from "./router.js";
+import { handlePageRequest, revalidatePath } from "./router.js";
 import { generateComponentsAndFillCache, generateRoutes} from "./utils/component-processor.js";
 import { initializeDirectories } from "./utils/files.js";
 
@@ -24,9 +24,6 @@ console.warn("Routes generated." + new Date().toISOString());
 
 const app = express();
 
-console.warn("Server is ready to accept requests." + publicDir);
-// app.use("/public", express.static(publicDir));
-
 app.use("/public", express.static(publicDir, {
   setHeaders(res, filePath) {
     if (filePath.endsWith(".js")) {
@@ -34,6 +31,8 @@ app.use("/public", express.static(publicDir, {
     }
   }
 }));
+
+app.get("/revalidate", revalidatePath); 
 
 const registerSSRRoutes = (app, routes) => {
   routes.forEach((route) => {

@@ -1,0 +1,24 @@
+<script server>
+  import { delay } from "server/utils/delay.js";
+
+  async function getData() {
+    await delay(1000);
+    return { message: "This is a message from server side fetch in build time" };
+  }
+
+  const metadata = {
+    title: "Static page with data fetching",
+    description:
+      "Static with data fetching. This page is pre-rendered at build time with data.",
+    revalidate: 'never'
+  };
+</script>
+<template>
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <header class="mb-12 text-center">
+      <h1 class="text-4xl font-bold mb-4">Static page with data fetched</h1>
+      <p class="text-lg text-gray-600">This page is static and was generated with data fetching.</p>
+      <p class="text-lg text-gray-600">{{message}}</p>
+    </header>
+  </div>
+</template>

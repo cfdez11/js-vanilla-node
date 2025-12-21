@@ -45,6 +45,14 @@ function processNode(node, scope, previousRendered = false) {
   if (node.type === "tag") {
     const attrs = node.attribs || {};
 
+    for (const [attrName, attrValue] of Object.entries(attrs)) {
+      if (typeof attrValue === "string") {
+        attrs[attrName] = attrValue.replace(/\{\{(.+?)\}\}/g, (_, expr) =>
+          getDataValue(expr.trim(), scope)
+        );
+      }
+    }
+
     if ("v-if" in attrs) {
       const show = getDataValue(attrs["v-if"], scope);
       delete attrs["v-if"];

@@ -2,7 +2,7 @@
        * @typedef {Object} RouteMeta
        * @property {boolean} ssr
        * @property {boolean} requiresAuth
-       * @property {number} revalidateSeconds
+       * @property {number | string} revalidate
        */
   
       /**
@@ -19,9 +19,9 @@
     serverPath: "/error",
     isNotFound: false,
     meta: {
-      ssr: "true",
+      ssr: true,
       requiresAuth: false,
-      revalidateSeconds: undefined ?? 0,
+      revalidate: "0" ,
     },
   },
 {
@@ -29,9 +29,9 @@
     serverPath: "/not-found",
     isNotFound: true,
     meta: {
-      ssr: "false",
+      ssr: false,
       requiresAuth: false,
-      revalidateSeconds: undefined ?? 0,
+      revalidate: "0" ,
     },
   },
 {
@@ -39,9 +39,9 @@
     serverPath: "/page-csr/:city",
     isNotFound: false,
     meta: {
-      ssr: "false",
+      ssr: false,
       requiresAuth: false,
-      revalidateSeconds: undefined ?? 0,
+      revalidate: "0" ,
     },
   },
 {
@@ -49,9 +49,9 @@
     serverPath: "/page-csr",
     isNotFound: false,
     meta: {
-      ssr: "false",
+      ssr: false,
       requiresAuth: false,
-      revalidateSeconds: undefined ?? 0,
+      revalidate: "0" ,
     },
   },
 {
@@ -59,9 +59,9 @@
     serverPath: "/page-ssr/:city",
     isNotFound: false,
     meta: {
-      ssr: "true",
+      ssr: false,
       requiresAuth: false,
-      revalidateSeconds: 10 ?? 0,
+      revalidate: "never" ,
     },
   },
 {
@@ -69,9 +69,9 @@
     serverPath: "/page-ssr",
     isNotFound: false,
     meta: {
-      ssr: "true",
+      ssr: true,
       requiresAuth: false,
-      revalidateSeconds: 10 ?? 0,
+      revalidate: "10" ,
     },
   },
 {
@@ -79,9 +79,29 @@
     serverPath: "/",
     isNotFound: false,
     meta: {
-      ssr: "true",
+      ssr: true,
       requiresAuth: false,
-      revalidateSeconds: undefined ?? 0,
+      revalidate: "0" ,
+    },
+  },
+{
+    path: "/static",
+    serverPath: "/static",
+    isNotFound: false,
+    meta: {
+      ssr: false,
+      requiresAuth: false,
+      revalidate: "0" ,
+    },
+  },
+{
+    path: "/static-with-data",
+    serverPath: "/static-with-data",
+    isNotFound: false,
+    meta: {
+      ssr: false,
+      requiresAuth: false,
+      revalidate: "never" ,
     },
   }
       ];

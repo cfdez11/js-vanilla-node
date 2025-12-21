@@ -2,6 +2,7 @@
   import { delay } from "server/utils/delay.js";
 
   async function getData() {
+    await delay(2000); 
     const cities = {
       madrid: { lat: 40.4168, lon: -3.7038, timezone: "Europe/Madrid", name: "Madrid" },
       barcelona: { lat: 41.3851, lon: 2.1734, timezone: "Europe/Madrid", name: "Barcelona" },
@@ -88,7 +89,7 @@
     title: "Weather SSR - Server Side Rendering",
     description:
       "Weather page with Server-Side Rendering. All data is loaded on the server before sending the page to the client.",
-    revalidateSeconds: 10
+    revalidate: 10
   };
 </script>
 <template>
@@ -172,5 +173,8 @@
         </div>
       </div>
     </section>
+
+    <section class="flex justify-end mt-4">
+    </section>  
   </div>
 </template>

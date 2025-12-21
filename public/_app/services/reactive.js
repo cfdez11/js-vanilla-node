@@ -186,3 +186,46 @@ export function computed(getter) {
     },
   };
 }
+
+/**
+ * Watches a reactive source and runs a callback when its value changes.
+ *
+ * @template T
+ * @param {() => T} source - A getter function returning the reactive value to watch.
+ * @param {(newValue: T, oldValue: T | undefined, onCleanup: (fn: () => void) => void) => void} callback
+ * @param {{ immediate?: boolean }} [options]
+ */
+export function watch(source, callback, options = {}) {
+  let oldValue;
+  let cleanupFn;
+
+  const onCleanup = (fn) => {
+    cleanupFn = fn;
+  };
+
+  const runner = () => {
+    const newValue = source();
+
+    // Skip first run if not immediate
+    if (oldValue === undefined && !options.immediate) {
+      oldValue = newValue;
+      return;
+    }
+
+    // Avoid unnecessary executions
+    if (Object.is(newValue, oldValue)) return;
+
+    // Cleanup previous effect
+    if (cleanupFn) {
+      cleanupFn();
+      cleanupFn = null;
+    }
+
+    callback(newValue, oldValue, onCleanup);
+    oldValue = newValue;
+  };
+
+  // Track dependencies reactively
+  effect(runner);
+}
+

@@ -1,146 +1,364 @@
 import { routes } from '../_routes.js';
+import { prefetchRouteComponent } from './cache.js';
+import { updateRouteParams } from './useRouteParams.js';
 
+/**
+ * Finds a route configuration matching a given path.
+ *
+ * Supports both static string paths and RegExp paths.
+ *
+ * @param {string} path - The path to match against the route definitions.
+ * @returns {Object|undefined} The matched route object, or undefined if no match.
+ */
 function findRoute(path) {
   return routes.find((r) => {
-    if (typeof r.path === "string") return r.path === path;
-    if (r.path instanceof RegExp) return path.match(r.path);
+    if (typeof r.path === 'string') return r.path === path;
+    if (r.path instanceof RegExp) return r.path.test(path);
     return false;
   });
 }
 
-function handleClickLink(event, link) {
-  const href = link.getAttribute("href");
-  const routePath = href.split("?")[0];
-  const route = findRoute(routePath);
+/**
+ * Sets up an IntersectionObserver to prefetch route components
+ * for links marked with `data-prefetch` when they enter the viewport.
+ */
+function setupPrefetchObserver() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      const link = entry.target;
+      if (!link.hasAttribute('data-prefetch')) return;
 
-  if (window.location.pathname === routePath) {
-    event.preventDefault();
-    return;
-  }
+      const url = new URL(link.href, window.location.origin);
 
-  // Client side navigation - SPA
-  if (route && !route.meta?.ssr) {
-    event.preventDefault();
-    navigate(href);
-  }
+      const route = routes.find(r => r.path === url.pathname);
+
+      if (!route?.component) return;
+
+      prefetchRouteComponent(route.path, route.component);
+      observer.unobserve(link);
+    });
+  }, { rootMargin: '200px' });
+
+  document.querySelectorAll('a[data-prefetch]').forEach((link) => {
+    if (!link.__prefetchObserved) {
+      link.__prefetchObserved = true;
+      observer.observe(link);
+    }
+  });
 }
 
 /**
- * Must be initialized inside a DOMContentLoaded event listener
+ * Initializes the SPA router, including:
+ * - Popstate listener for back/forward navigation
+ * - Link interception for client-side routing
+ * - Prefetch observer setup
+ *
+ * Must be called after DOMContentLoaded.
  */
-export async function initializeRouter() {
-  window.addEventListener("popstate", () => {
+export function initializeRouter() {
+  window.addEventListener('popstate', () => {
     navigate(location.pathname, false);
   });
 
-  document.addEventListener("click", (event) => {
-    const link = event.target.closest("a");
-    if (link) {
-      handleClickLink(event, link);
-    }
-  });
+  setupPrefetchObserver();
+  setupLinkInterceptor();
 
+  // Perform initial navigation if is not SSR
+  const route = findRoute(location.pathname);
+  if (route?.meta?.ssr) return;
+  
   navigate(location.pathname, false);
 }
 
 /**
- * Adds hydrate-client-components script to the document head
- * @returns {void}
+ * Sets up click interception on internal links to perform SPA navigation
+ * instead of full page reloads.
+ *
+ * Links with `data-reload`, `_blank`, `rel="external"` or external URLs
+ * are ignored.
  */
-function addHydrateClientComponentScript() {
-  if (document.querySelector('script[src="/public/_app/services/hydrate-client-components.js"]')) {
-    return;
-  }
+function setupLinkInterceptor() {
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a');
+    if (!link) return;
 
-  const hydrateScript = document.createElement("script");
-  hydrateScript.src = "/public/_app/services/hydrate-client-components.js";
-  hydrateScript.type = "module";
-  document.head.appendChild(hydrateScript);
+    const href = link.getAttribute('href');
+    
+    if (!href || href.startsWith('#')) return;
+
+    const url = new URL(href, window.location.origin);
+    const isExternal = url.origin !== window.location.origin;
+    const forceReload = link.dataset.reload !== undefined;
+
+    if (
+      isExternal ||
+      forceReload ||
+      link.target === '_blank' ||
+      link.rel === 'external'
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    navigate(url.pathname);
+  });
 }
 
-const addMetadata = (metadata) => {
+/**
+ * Injects route metadata (title, description) into the document head.
+ *
+ * @param {Object} metadata - The route metadata.
+ * @param {string} [metadata.title] - Page title to set.
+ * @param {string} [metadata.description] - Page description meta tag.
+ */
+
+function addMetadata(metadata) {
   if (metadata.title) {
     document.title = metadata.title;
   }
+
   if (metadata.description) {
     let descriptionMeta = document.querySelector('meta[name="description"]');
+
     if (!descriptionMeta) {
-      descriptionMeta = document.createElement("meta");
-      descriptionMeta.name = "description";
+      descriptionMeta = document.createElement('meta');
+      descriptionMeta.name = 'description';
       document.head.appendChild(descriptionMeta);
     }
+
     descriptionMeta.content = metadata.description;
   }
 }
 
 /**
- * 
- * @param {{
- * path: string,
- * meta: { ssr: boolean, requiresAuth: false, [key: string]: any }
- * }} route 
- * @param {string} path 
- * @returns {void}
+ * Renders a route component into the main container.
+ *
+ * @param {Object} route - The route object.
+ * @param {string} path - The route path.
+ * @returns {Promise<void>}
  */
-export function renderPage(route, path) {
-  const main = document.querySelector("main");
+export async function renderPage(route, path) {
+  if (!route?.component) return;
 
-  if (!route || !route.component) {
-    return;
-  }
+  const { hydrateClientComponent, metadata } = await route.component();
 
-  // Get regex matches for dynamic routes
-  let params = [];
-  if (route.path instanceof RegExp) {
-    const match = path.match(route.path);
-    params = match ? match.slice(1) : [];
-  }
+  if(!hydrateClientComponent) return;
 
-  // create template marker
-  main.innerHTML = "";
-  const marker = document.createElement("template");
+  const main = document.querySelector('main');
+  if (!main) return;
+
+  main.innerHTML = '';
+
+  const marker = document.createElement('template');
   main.appendChild(marker);
 
-  // render component into marker
-  route.component(marker);
-
-  if (route.metadata) {
-    addMetadata(route.meta);
+  hydrateClientComponent(marker);
+  
+  if (metadata) {
+    addMetadata(metadata);
   }
 
-  addHydrateClientComponentScript();
+  hydrateComponents(); // global function from hydrate-client-components.js
 }
 
 /**
- * Redirect user a new page page by path, with optional history addition
- * @param {string} path 
- * @param {boolean} addToHistory 
- * @returns {void}
+ * Navigates to a given path using SPA behavior for CSR routes.
+ * Performs history push and renders the page component.
+ *
+ * Updates route params store on navigation.
+ * @param {string} path - The target route path.
+ * @param {boolean} [addToHistory=true] - Whether to push to history stack.
  */
-export function navigate(path, addToHistory = true) {
-  const routePath = path.split("?")[0];
+export async function navigate(path, addToHistory = true) {
+  updateRouteParams(path);
+
+  const routePath = path.split('?')[0];
   const route = findRoute(routePath);
 
-  // Skip SSR routes
-  if (route?.meta?.ssr) return;
-
   if (addToHistory) {
-    history.pushState({}, "", path);
+    history.pushState({}, '', path);
   }
 
-  // Auth checks
+  if (route?.meta?.ssr) {
+    await renderSSRPage(path);
+    return;
+  };
+
   if (route?.meta?.requiresAuth && !app.Store?.loggedIn) {
-    navigate("/account/login");
+    navigate('/account/login');
     return;
   }
 
   if (route?.meta?.accessOnly && app.Store?.loggedIn) {
-    navigate("/account");
+    navigate('/account');
     return;
   }
 
   renderPage(route, routePath);
 }
+
+/**
+ * Fetches an SSR page via streaming and progressively updates the DOM.
+ * @async
+ * @param {string} path - The URL/path of the SSR page to fetch.
+ * @throws {Error} If the response body is not readable or the <main> element is missing.
+ */
+async function renderSSRPage(path) {
+  const response = await fetch(path);
+  if (!response.body) throw new Error('Invalid response body');
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let htmlBuffer = '';
+
+  const mainEl = document.querySelector('main');
+  if (!mainEl) throw new Error('<main> element not found');
+
+  const parser = new DOMParser();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    htmlBuffer += decoder.decode(value, { stream: true });
+
+    htmlBuffer = processSSRMain(htmlBuffer, parser, mainEl);
+    htmlBuffer = processSSRTemplates(htmlBuffer, parser);
+    htmlBuffer = processSSRScripts(htmlBuffer, parser);
+    updateSSRMetadata(htmlBuffer, parser);
+    hydrateComponents(); // global function from hydrate-client-components.js
+  }
+}
+
+/**
+ * Processes a <main> element from the buffer and updates the DOM.
+ * @param {string} buffer - Current HTML buffer.
+ * @param {DOMParser} parser - DOMParser instance.
+ * @param {HTMLElement} mainEl - The <main> element to update.
+ * @returns {string} Remaining HTML buffer after processing.
+ */
+function processSSRMain(buffer, parser, mainEl) {
+  const mainMatch = buffer.match(/<main[\s\S]*?<\/main>/i);
+  if (mainMatch) {
+    const mainDoc = parser.parseFromString(mainMatch[0], 'text/html');
+    const newMain = mainDoc.querySelector('main');
+
+    if (newMain) {
+      mainEl.innerHTML = newMain.innerHTML;
+    }
+
+    return buffer.slice(mainMatch.index + mainMatch[0].length);
+  }
+
+  return buffer;
+}
+
+/**
+ * Processes <template> elements from the buffer and injects into the DOM.
+ * @param {string} buffer - Current HTML buffer.
+ * @param {DOMParser} parser - DOMParser instance.
+ * @returns {string} Remaining HTML buffer after processing.
+ */
+function processSSRTemplates(buffer, parser) {
+  const templateRegex = /<template[\s\S]*?<\/template>/gi;
+  let match;
+  while ((match = templateRegex.exec(buffer)) !== null) {
+    const tempDoc = parser.parseFromString(match[0], 'text/html').querySelector('template');
+    if (tempDoc && !document.getElementById(tempDoc.id)) {
+      document.body.appendChild(tempDoc.cloneNode(true));
+    }
+  }
+  const closeTemplateTag = '</template>';
+  const lastIndex = buffer.lastIndexOf(closeTemplateTag);
+  if (lastIndex !== -1) {
+    return buffer.slice(lastIndex + closeTemplateTag.length);
+  }
+  return buffer;
+}
+
+/**
+ * Processes <script> elements from the buffer, executes inline scripts, and injects external scripts.
+ * @param {string} buffer - Current HTML buffer.
+ * @param {DOMParser} parser - DOMParser instance.
+ * @returns {string} Remaining HTML buffer after processing.
+ */
+function processSSRScripts(buffer, parser) {
+  const scriptRegex = /<script[\s\S]*?<\/script>/gi;
+  let match;
+  while ((match = scriptRegex.exec(buffer)) !== null) {
+    const scriptEl = parser.parseFromString(match[0], 'text/html').querySelector('script');
+    if (!scriptEl) continue;
+
+    // Hydration scripts for Suspense
+    if (scriptEl.dataset.target && scriptEl.dataset.source) {
+      const targetId = scriptEl.dataset.target;
+      const sourceId = scriptEl.dataset.source;
+      const existScript = document.querySelector(`script[data-target="${targetId}"][data-source="${sourceId}"]`);
+      
+      if (!existScript) {
+        const newScript = document.createElement('script');
+        Object.keys(scriptEl.dataset).forEach(k => newScript.dataset[k] = scriptEl.dataset[k]);
+        newScript.src = scriptEl.src;
+        newScript.async = true;
+        const templateEl = document.getElementById(sourceId);
+        if (templateEl) {
+          templateEl.after(newScript);
+        } else {
+          document.body.appendChild(newScript);
+        }
+      }
+    }
+    // External scripts
+    else if (scriptEl.src) {
+      const srcPath = new URL(scriptEl.src, window.location.origin).pathname;
+      if (!Array.from(document.scripts).some(s => new URL(s.src, window.location.origin).pathname === srcPath)) {
+        const newScript = document.createElement('script');
+        newScript.src = scriptEl.src;
+        newScript.async = true;
+        document.head.appendChild(newScript);
+      }
+    }
+    // Inline scripts
+    else {
+      try { 
+        new Function(scriptEl.textContent)(); 
+      } catch (e) { 
+        console.error('Error executing inline script:', e); 
+      }
+    }
+  }
+
+  const lastIndex = buffer.lastIndexOf('</script>');
+  if (lastIndex !== -1) return buffer.slice(lastIndex + 9);
+  return buffer;
+}
+
+/**
+ * Updates document <title> and <meta name="description"> if present in the buffer.
+ * @param {string} buffer - Current HTML buffer.
+ * @param {DOMParser} parser - DOMParser instance.
+ */
+function updateSSRMetadata(buffer, parser) {
+  const tempDoc = parser.parseFromString(buffer, 'text/html');
+
+  const titleEl = tempDoc.querySelector('title');
+  if (titleEl) {
+    document.title = titleEl.textContent;
+  }
+
+  const metaDesc = tempDoc.querySelector('meta[name="description"]');
+  if (metaDesc) {
+    let meta = document.querySelector('meta[name="description"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'description';
+      document.head.appendChild(meta);
+    }
+    meta.content = metaDesc.content;
+  }
+}
+
 
 /**
  * Parses the URL search string into a plain object.

@@ -2,9 +2,10 @@ import {
   renderSuspenseComponent,
   generateReplacementContent,
 } from "./utils/streaming.js";
-import { getCachedComponentHtml, setCachedComponentHtml } from "./utils/cache.js";
+import { getCachedComponentHtml, getRevalidateSeconds, revalidateCachedComponentHtml, saveCachedComponentHtml } from "./utils/cache.js";
 import { getPagePath } from "./utils/files.js";
 import { renderPageWithLayout } from "./utils/component-processor.js";
+import { routes } from "./_app/_routes.js";
 
 const FALLBACK_ERROR_HTML = `
   <!DOCTYPE html>
@@ -115,7 +116,7 @@ const endStreamResponse = (res, htmlChunks) => {
  * @param {boolean} params.route.meta.requiresAuth
  *   Indicates if authentication is required.
  *
- * @param {number} params.route.meta.revalidateSeconds
+ * @param {number} params.route.meta.revalidate
  *   ISR revalidation interval in seconds. A value > 0 enables ISR.
  *
  * @returns {Promise<void>}
@@ -132,13 +133,13 @@ async function renderAndSendPage({
 }) {
   // todo: check if this getPageParhWorks correctly (check with depth in pages)
   const pagePath = getPagePath(pageName);
-  const revalidateSeconds = route.meta?.revalidateSeconds ?? 0;
-  const isISR = revalidateSeconds > 0;
+  const revalidateSeconds = getRevalidateSeconds(route.meta?.revalidate ?? 0);
+  const isISR = revalidateSeconds !== 0;
 
   if(isISR) {
     const { html: cachedHtml, isStale } = await getCachedComponentHtml({ 
       componentPath: context.req.url, 
-      revalidateSeconds: route.meta.revalidateSeconds,
+      revalidateSeconds: revalidateSeconds,
     });
 
     if(cachedHtml && !isStale) {
@@ -155,7 +156,7 @@ async function renderAndSendPage({
     sendResponse(context.res, statusCode, html);
 
     if(isISR) {
-      setCachedComponentHtml({ componentPath: context.req.url, html });
+      saveCachedComponentHtml({ componentPath: context.req.url, html });
     }
     return;
   }
@@ -202,7 +203,7 @@ async function renderAndSendPage({
   endStreamResponse(context.res, htmlChunks);
 
   if(isISR && !abortedStream && !errorStream) {
-    setCachedComponentHtml({
+    saveCachedComponentHtml({
       componentPath: pagePath,
       html: htmlChunks.join("")
     });
@@ -239,7 +240,7 @@ async function renderAndSendPage({
  */
 export async function handlePageRequest(req, res, route) {
   if (!route) {
-    const notFoundRoute = serverRoutes.find(r => r.isNotFound);
+    const notFoundRoute = routes.find(r => r.isNotFound);
     return handlePageRequest(req, res, notFoundRoute);
   }
 
@@ -272,5 +273,50 @@ export async function handlePageRequest(req, res, route) {
       console.error(`Failed to render error page: ${err.message}`);
       sendResponse(res, 500, FALLBACK_ERROR_HTML);
     }
+  }
+}
+
+
+/**
+ * Express route handler to mark a cached component or page as stale for ISR-like revalidation.
+ *
+ * This endpoint allows clients to request that the server invalidate the cached HTML
+ * of a specific component or page. The cache will be regenerated automatically
+ * on the next request for that component.
+ *
+ * @async
+ * @param {import('express').Request} req - The Express request object. Expects a query parameter `path` specifying the component/page path to revalidate.
+ * @param {import('express').Response} res - The Express response object. Will send a JSON response indicating success or failure.
+ *
+ * @returns {Promise<import('express').Response>} JSON response with:
+ *   - 200: { message: string } if the cache was successfully marked as stale
+ *   - 400: { error: string } if the required `path` query parameter is missing
+ *   - 500: { error: string } if an unexpected error occurs during revalidation
+ *
+ * @example
+ * // Client request:
+ * // POST /revalidate?path=/about
+ * 
+ * // Response:
+ * // {
+ * //   "message": "Cache for '/about' marked as stale. It will regenerate on next request."
+ * // }
+ */
+export async function revalidatePath(req, res) {
+  try {
+    const componentPath = req.query.path;
+
+    if (!componentPath) {
+      return res.status(400).json({ error: "Missing 'path' query parameter" });
+    }
+
+    await revalidateCachedComponentHtml(componentPath);
+
+    return res.status(200).json({
+      message: `Cache for '${componentPath}' marked as stale. It will regenerate on next request.`
+    });
+  } catch (err) {
+    console.error("Error revalidating cache:", err);
+    return res.status(500).json({ error: "Failed to revalidate cache" });
   }
 }

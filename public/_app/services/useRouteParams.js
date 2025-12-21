@@ -1,54 +1,78 @@
+import { reactive } from "./reactive.js";
+import { routes } from '../_routes.js';
+
 /**
- * Extracts dynamic route parameters from the current path.
- * 
- * This function matches the current URL against a set of predefined routes
- * that may contain dynamic segments indicated by the `:paramName` syntax.
- * It supports multiple dynamic parameters in a single route.
- *
- * @param {string} [currentPath=window.location.pathname] - The current URL path to parse.
- * @returns {Object} An object containing the key-value pairs of route parameters.
- *
- * Example:
- *  Routes: [{ path: '/users/:userId/:postId' }]
- *  Path: '/users/1/53'
- *  Returns: { userId: '1', postId: '53' }
+ * Reactive store holding the current route params.
+ * This object is updated whenever the URL changes.
  */
-export function useRouteParams(currentPath = window.location.pathname) {
-  try {
-const pathParts = currentPath.split('/').filter(Boolean);
+const routeParams = reactive({});
+
+/**
+ * Extracts dynamic parameters from a pathname based on route definitions.
+ *
+ * Supported syntax:
+ *   /posts/:id
+ *   /users/:userId/:postId
+ *
+ * @param {string} pathname - URL pathname (no query, no hash)
+ * @returns {Object} Extracted params
+ */
+function extractParams(pathname) {
+  const pathParts = pathname.split("/").filter(Boolean);
 
   for (const route of routes) {
-    const routeParts = route.path.split('/').filter(Boolean);
-
-    // Skip routes with a different number of segments
+    const routeParts = route.path.split("/").filter(Boolean);
     if (routeParts.length !== pathParts.length) continue;
 
     const params = {};
-    let isMatch = true;
+    let match = true;
 
     for (let i = 0; i < routeParts.length; i++) {
       const routePart = routeParts[i];
       const pathPart = pathParts[i];
 
-      if (routePart.startsWith(':')) {
-        // Extract parameter name and assign corresponding value from path
-        const paramName = routePart.slice(1);
-        params[paramName] = pathPart;
+      if (routePart.startsWith(":")) {
+        params[routePart.slice(1)] = pathPart;
       } else if (routePart !== pathPart) {
-        // If a static segment does not match, this route is not a match
-        isMatch = false;
+        match = false;
         break;
       }
     }
 
-    // If a matching route is found, return the extracted parameters
-    if (isMatch) return params;
+    if (match) return params;
   }
 
-  // Return an empty object if no matching route is found
   return {};
-  } catch(e) {
-    console.error("useRouteParams error:", e);
-    return {};
-  }
+}
+
+/**
+ * Updates the reactive route params based on the current URL.
+ * @param {string} [path=window.location.pathname] - URL pathname to extract params from
+ * @example
+ * updateRouteParams(); // Updates params from current URL
+ * updateRouteParams("/posts/42"); // Updates params from given path
+ */
+export function updateRouteParams(path = window.location.pathname) {
+  const newParams = extractParams(path);
+
+  Object.keys(routeParams).forEach(k => delete routeParams[k]); 
+  Object.assign(routeParams, newParams);
+
+  console.log("Route params updated:", routeParams);
+}
+
+/**
+ * Composition function returning reactive route params.
+ *
+ * @returns {Object} Reactive route params
+ *
+ * @example
+ * const params = useRouteParams();
+ *
+ * effect(() => {
+ *   console.log(params.id);
+ * });
+ */
+export function useRouteParams() {
+  return routeParams;
 }
