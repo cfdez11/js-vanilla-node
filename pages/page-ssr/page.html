@@ -1,5 +1,5 @@
 <script server>
-  import { delay } from "server/utils/delay.js";
+  import { delay } from ".app/server/utils/delay.js";
 
   async function getData() {
     await delay(2000); 
@@ -174,7 +174,25 @@
       </div>
     </section>
 
-    <section class="flex justify-end mt-4">
-    </section>  
+       <section class="flex justify-end mt-4">
+      <a href="/page-ssr/madrid" class="text-blue-600 hover:underline font-medium">
+        View Madrid Weather →
+      </a>
+      <a href="/page-ssr/barcelona" class="text-blue-600 hover:underline font-medium">
+        View Barcelona Weather →
+      </a>
+      <a href="/page-ssr/londres" class="ml-6 text-blue-600 hover:underline font-medium">
+        View Londres Weather →
+      </a>
+      <a href="/page-ssr/nuevayork" class="ml-6 text-blue-600 hover:underline font-medium">
+        View Nueva York Weather →
+      </a>
+      <a href="/page-ssr/paris" class="ml-6 text-blue-600 hover:underline font-medium">
+        View París Weather →
+      </a>
+      <a href="/page-ssr/tokio" class="ml-6 text-blue-600 hover:underline font-medium">
+        View Tokio Weather →
+      </a> 
+    </section> 
   </div>
 </template>
