@@ -571,21 +571,6 @@ export async function getPageFiles() {
 }
 
 /**
- * Retrieves all component HTML files.
- * todo: in future we will use imports from pages to detect used components this function will be removed
- * @async
- * @returns {Promise<Array<{ fullpath: string, path: string }>>}
- */
-export async function getComponentFiles() {
-  const componentFiles = await readDirectoryRecursive(COMPONENTS_DIR);
-  const htmlFiles = componentFiles.filter((file) =>
-    file.fullpath.endsWith(".html")
-  );
-
-  return htmlFiles;
-}
-
-/**
  * Converts a page file path into a server routing path.
  *
  * Dynamic segments `[param]` are converted to `:param`

@@ -161,7 +161,6 @@ function handleConditionalChain(parent, children, startIndex, markers, values) {
       kept = item.element;
       item.element.removeAttribute('v-else');
     } else {
-      // todo: fix bug, en template string creo que no esta bien el value
       const markerIndex = markers.findIndex(m => item.condition.includes(m));
       const condition = markerIndex !== -1 ? values[markerIndex] : false;
       if (condition) {

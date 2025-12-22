@@ -729,7 +729,6 @@ async function generateServerComponentHTML(componentPath) {
  *                            the `<template>` HTML for hydration.
  */
 export async function processClientComponent(componentName, originalPath, props = {}) {
-  // todo: en servidor debemos pasar las props iniciales
   const targetId = `client-${componentName}-${Date.now()}`;
 
   const propsEntries = Object.entries(props)
@@ -745,7 +744,7 @@ export async function processClientComponent(componentName, originalPath, props 
 
   const componentImport = generateComponentId(originalPath)
   const html = `<template id="${targetId}" data-client:component="${componentImport}" data-client:props='${propsEntries ? `\${JSON.stringify({${propsEntries}})}` : "{}"}'></template>`;
-// todo : ${JSON.stringify({ links })}
+  
   return html;
 }
 
