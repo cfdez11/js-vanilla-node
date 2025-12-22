@@ -1,5 +1,9 @@
 # Vanilla JS Framework
 
+[![pnpm](https://img.shields.io/badge/pnpm-F69220?logo=pnpm&logoColor=fff)](#)
+[![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=000)](#)
+[![Node.js](https://img.shields.io/badge/Node.js-6DA55F?logo=node.js&logoColor=white)](#)
+
 A minimalist vanilla JavaScript framework with support for Server-Side Rendering (SSR), Client-Side Rendering (CSR), reactive components, and streaming with suspense.
 
 ## 📁 Project Structure
@@ -130,7 +134,7 @@ Server components are rendered on the backend. They are defined with the `s-` pr
 // server/components/user-card.js
 export default async function UserCard({ userId }) {
   const user = await fetch(`https://api.example.com/users/${userId}`).then(
-    (res) => res.json()
+    (res) => res.json(),
   );
 
   return `
@@ -295,6 +299,7 @@ pnpm format       # Format code with Biome
 ## 🏗️ Rendering Flow
 
 ### SSR (Server-Side Rendering)
+
 ```mermaid
 ---
 config:
@@ -311,7 +316,7 @@ sequenceDiagram
 
         Client ->> Server: request page /blog
         Note over Client,Server: Request SSR
-        Server ->> Router: handlePageRequest(req, res, route) 
+        Server ->> Router: handlePageRequest(req, res, route)
         Router ->> ComponentProcessor: renderHtmlFile(filePath, data)
         ComponentProcessor ->> ComponentProcessor: processHtmlFile(filePath)
         Note over ComponentProcessor: getData, metatada, <br />template, clientCode, <br />sComponentsMap, cComponentsMap
@@ -349,7 +354,6 @@ sequenceDiagram
         end
 ```
 
-
 ### CSR (Client-Side Rendering)
 
 1. Request → Server sends minimal HTML
@@ -381,8 +385,8 @@ Future features planned for implementation:
 - [ ] **Regeneration in background** - Regenerate page after send response (locks)
 - [ ] **Change syntax**
 - [ ] **Create NPM extension package** - Extension to recognize sintax
-- [ ] **Use custom extension** - custom extension to have correct imports, lint, colors, etc. 
+- [ ] **Use custom extension** - custom extension to have correct imports, lint, colors, etc.
 - [ ] **Create NPM package** - Create package to save all logic framework and reused it in other projects
-- [ ] **Cache with CDN** 
+- [ ] **Cache with CDN**
 - [ ] **Fix error replace marker** Only occurs when template has multiple childs no wrapped in div /fragment
 - [ ] **Authentication** - Built-in authentication system with middleware support
