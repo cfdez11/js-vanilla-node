@@ -304,7 +304,7 @@ function getNodePropertyInfo(attrName) {
   const nodeProperties = { 
     class: { property: "className", canBeJoined: true } 
   };
-  return nodeProperties[attrName] || attrName;
+  return nodeProperties[attrName] || { property: attrName, canBeJoined: false };
 }
 
 /**
@@ -360,6 +360,19 @@ function processAttributes(element, markers, values) {
       element.style.display = value ? "" : "none";
       element.removeAttribute("v-show");
       continue;
+    }
+
+    // data set attributes
+    if(attr.name.startsWith("data-")) {
+      const dataAttr = attr.name.slice(5);
+      const idx = markers.findIndex((m) => attr.value.includes(m));
+
+      if (idx !== -1) {
+        const value = values[idx];
+        element.dataset[dataAttr] = typeof value === "object" && value !== null
+          ? JSON.stringify(value)
+          : String(value ?? "");
+      }
     }
   }
 }

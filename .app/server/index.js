@@ -1,6 +1,4 @@
 import express from "express";
-import path from "path";
-import { fileURLToPath } from "url";
 import { handlePageRequest, revalidatePath } from "./utils/router.js";
 import { generateComponentsAndFillCache, generateRoutes} from "./utils/component-processor.js";
 import { initializeDirectories, CLIENT_DIR } from "./utils/files.js";
@@ -8,13 +6,12 @@ import { initializeDirectories, CLIENT_DIR } from "./utils/files.js";
 await initializeDirectories();
 
 // Pre-generate all client and server components to have their import statements ready
-generateComponentsAndFillCache();
-console.warn("Components generated.");
+await generateComponentsAndFillCache();
+console.log("Components generated.");
 
 // generate routes automatically
 const { serverRoutes } = await generateRoutes();
-console.warn("Routes generated.");
-
+console.log("Routes generated.");
 
 
 const app = express();

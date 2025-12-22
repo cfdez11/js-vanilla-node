@@ -1,21 +1,57 @@
-import { routes } from '../_routes.js';
+import { routes } from './_routes.js';
 import { prefetchRouteComponent } from './cache.js';
 import { updateRouteParams } from './useRouteParams.js';
+import './hydrate-client-components.js';
+
+let currentNavigationController = null;
 
 /**
- * Finds a route configuration matching a given path.
- *
- * Supports both static string paths and RegExp paths.
- *
- * @param {string} path - The path to match against the route definitions.
- * @returns {Object|undefined} The matched route object, or undefined if no match.
+ * Converts a route path with parameters (e.g., '/page/:city/:team') into a RegExp
+ * and captures the parameter names.
+ * 
+ * @param {string} routePath - The route path to convert
+ * @returns {{regex: RegExp, keys: string[]}} The generated RegExp and parameter keys
  */
-function findRoute(path) {
-  return routes.find((r) => {
-    if (typeof r.path === 'string') return r.path === path;
-    if (r.path instanceof RegExp) return r.path.test(path);
-    return false;
-  });
+function pathToRegex(routePath) {
+  const keys = [];
+  const regex = new RegExp(
+    "^" +
+    routePath.replace(/:([^/]+)/g, (_, key) => {
+      keys.push(key);
+      return "([^/]+)";
+    }) +
+    "$"
+  );
+  return { regex, keys };
+}
+
+/**
+ * Finds a route that matches the given path and extracts route parameters.
+ * Always returns an object with `route` and `params`.
+ * 
+ * @param {string} path - The URL path to match (e.g., '/page/madrid/barcelona')
+ * @returns {MatchedRoute} An object containing the matched route and params
+ */
+function findRouteWithParams(path) {
+  for (const r of routes) {
+    if (typeof r.path === "string") {
+      const { regex, keys } = pathToRegex(r.path);
+      const match = path.match(regex);
+      if (match) {
+        const params = {};
+        keys.forEach((key, i) => {
+          params[key] = match[i + 1];
+        });
+        return { route: r, params };
+      }
+    } else if (r.path instanceof RegExp) {
+      if (r.path.test(path)) {
+        return { route: r, params: {} };
+      }
+    }
+  }
+
+  return { route: null, params: {} };
 }
 
 /**
@@ -65,9 +101,9 @@ export function initializeRouter() {
   setupLinkInterceptor();
 
   // Perform initial navigation if is not SSR
-  const route = findRoute(location.pathname);
+  const { route } = findRouteWithParams(location.pathname);
   if (route?.meta?.ssr) return;
-  
+
   navigate(location.pathname, false);
 }
 
@@ -84,7 +120,7 @@ function setupLinkInterceptor() {
     if (!link) return;
 
     const href = link.getAttribute('href');
-    
+
     if (!href || href.startsWith('#')) return;
 
     const url = new URL(href, window.location.origin);
@@ -143,7 +179,7 @@ export async function renderPage(route, path) {
 
   const { hydrateClientComponent, metadata } = await route.component();
 
-  if(!hydrateClientComponent) return;
+  if (!hydrateClientComponent) return;
 
   const main = document.querySelector('main');
   if (!main) return;
@@ -154,7 +190,7 @@ export async function renderPage(route, path) {
   main.appendChild(marker);
 
   hydrateClientComponent(marker);
-  
+
   if (metadata) {
     addMetadata(metadata);
   }
@@ -167,45 +203,69 @@ export async function renderPage(route, path) {
  * Performs history push and renders the page component.
  *
  * Updates route params store on navigation.
+ * 
+ * Control of ongoing navigations with AbortController
  * @param {string} path - The target route path.
  * @param {boolean} [addToHistory=true] - Whether to push to history stack.
  */
 export async function navigate(path, addToHistory = true) {
+  // abort previous SSR fetch
+  if (currentNavigationController) {
+    currentNavigationController.abort();
+  }
+
+  const controller = new AbortController();
+  currentNavigationController = controller;
+
   updateRouteParams(path);
 
   const routePath = path.split('?')[0];
-  const route = findRoute(routePath);
+  const { route } = findRouteWithParams(routePath);
 
   if (addToHistory) {
     history.pushState({}, '', path);
   }
 
-  if (route?.meta?.ssr) {
-    await renderSSRPage(path);
-    return;
-  };
+  try {
+    if (route?.meta?.ssr) {
+      await renderSSRPage(path, controller.signal);
+      return;
+    };
 
-  if (route?.meta?.requiresAuth && !app.Store?.loggedIn) {
-    navigate('/account/login');
-    return;
+    if (route?.meta?.requiresAuth && !app.Store?.loggedIn) {
+      navigate('/account/login');
+      return;
+    }
+
+    if (route?.meta?.accessOnly && app.Store?.loggedIn) {
+      navigate('/account');
+      return;
+    }
+
+    renderPage(route, routePath);
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      console.log('Navigation aborted due to route change');
+      return;
+    }
+    console.error('Navigation error:', e);
+  } finally {
+    if (currentNavigationController === controller) {
+      currentNavigationController = null;
+    }
   }
 
-  if (route?.meta?.accessOnly && app.Store?.loggedIn) {
-    navigate('/account');
-    return;
-  }
-
-  renderPage(route, routePath);
 }
 
 /**
  * Fetches an SSR page via streaming and progressively updates the DOM.
  * @async
  * @param {string} path - The URL/path of the SSR page to fetch.
+ * @param {AbortSignal} signal - The AbortSignal to cancel the fetch if needed.
  * @throws {Error} If the response body is not readable or the <main> element is missing.
  */
-async function renderSSRPage(path) {
-  const response = await fetch(path);
+async function renderSSRPage(path, signal) {
+  const response = await fetch(path, { signal });
   if (!response.body) throw new Error('Invalid response body');
 
   const reader = response.body.getReader();
@@ -295,7 +355,7 @@ function processSSRScripts(buffer, parser) {
       const targetId = scriptEl.dataset.target;
       const sourceId = scriptEl.dataset.source;
       const existScript = document.querySelector(`script[data-target="${targetId}"][data-source="${sourceId}"]`);
-      
+
       if (!existScript) {
         const newScript = document.createElement('script');
         Object.keys(scriptEl.dataset).forEach(k => newScript.dataset[k] = scriptEl.dataset[k]);
@@ -321,10 +381,10 @@ function processSSRScripts(buffer, parser) {
     }
     // Inline scripts
     else {
-      try { 
-        new Function(scriptEl.textContent)(); 
-      } catch (e) { 
-        console.error('Error executing inline script:', e); 
+      try {
+        new Function(scriptEl.textContent)();
+      } catch (e) {
+        console.error('Error executing inline script:', e);
       }
     }
   }
@@ -593,57 +653,3 @@ export function useQueryParams(options = {}) {
   }
 }
 
-/**
- * Extracts dynamic route parameters from the current path.
- * 
- * This function matches the current URL against a set of predefined routes
- * that may contain dynamic segments indicated by the `:paramName` syntax.
- * It supports multiple dynamic parameters in a single route.
- *
- * @param {string} [currentPath=window.location.pathname] - The current URL path to parse.
- * @returns {Object} An object containing the key-value pairs of route parameters.
- *
- * Example:
- *  Routes: [{ path: '/users/:userId/:postId' }]
- *  Path: '/users/1/53'
- *  Returns: { userId: '1', postId: '53' }
- */
-export function useRouteParams(currentPath = window.location.pathname) {
-  try {
-const pathParts = currentPath.split('/').filter(Boolean);
-
-  for (const route of routes) {
-    const routeParts = route.path.split('/').filter(Boolean);
-
-    // Skip routes with a different number of segments
-    if (routeParts.length !== pathParts.length) continue;
-
-    const params = {};
-    let isMatch = true;
-
-    for (let i = 0; i < routeParts.length; i++) {
-      const routePart = routeParts[i];
-      const pathPart = pathParts[i];
-
-      if (routePart.startsWith(':')) {
-        // Extract parameter name and assign corresponding value from path
-        const paramName = routePart.slice(1);
-        params[paramName] = pathPart;
-      } else if (routePart !== pathPart) {
-        // If a static segment does not match, this route is not a match
-        isMatch = false;
-        break;
-      }
-    }
-
-    // If a matching route is found, return the extracted parameters
-    if (isMatch) return params;
-  }
-
-  // Return an empty object if no matching route is found
-  return {};
-  } catch(e) {
-    console.error("useRouteParams error:", e);
-    return {};
-  }
-}

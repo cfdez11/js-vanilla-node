@@ -1,5 +1,5 @@
 import { reactive } from "./reactive.js";
-import { routes } from '../_routes.js';
+import { routes } from './_routes.js';
 
 /**
  * Reactive store holding the current route params.
@@ -57,8 +57,6 @@ export function updateRouteParams(path = window.location.pathname) {
 
   Object.keys(routeParams).forEach(k => delete routeParams[k]); 
   Object.assign(routeParams, newParams);
-
-  console.log("Route params updated:", routeParams);
 }
 
 /**

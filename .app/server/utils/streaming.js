@@ -7,19 +7,50 @@ import {
 const suspenseRegex = /<Suspense\s+fallback="([^"]*)">([\s\S]*?)<\/Suspense>/g;
 
 /**
- * Parses raw attribute string into an object
- * @param {string} raw
- * @returns {Object<string, string>}
+ * Parses a string of raw HTML-like attributes into a structured object.
+ * Return object will be used to pass props to components through template
+ *
+ * Supports:
+ *   - Dynamic props with `:` prefix (e.g., `:prop="value"`).
+ *   - Event handlers with `@` prefix (e.g., `@click="handler"`).
+ *   - Static attributes (e.g., `id="my-id"` or `class="my-class"`).
+ *
+ * @param {string} rawAttrs - The raw attribute string extracted from an element tag.
+ *
+ * @returns {Record<string, string>} An object mapping attribute names to their values.
+ *                                   Dynamic props and event handlers retain their raw
+ *                                   string representations (e.g., template expressions).
+ *
+ * @example
+ * parseAttributes(':links="${links}" @click="handleClick" id="my-component"');
+ * // Returns:
+ * // {
+ * //   links: '${links}',
+ * //   click: 'handleClick',
+ * //   id: 'my-component'
+ * // }
  */
-function parseAttributes(raw) {
+function parseAttributes(rawAttrs) {
   const attrs = {};
-  const regex = /([a-zA-Z0-9_:-]+)="([^"]*)"/g;
+  const regex = /:(\w+)=['"]([^'"]+)['"]|@(\w+)=['"]([^'"]+)['"]|(\w+)=['"]([^'"]+)['"]/g;
   let match;
-  while ((match = regex.exec(raw))) {
-    attrs[match[1]] = match[2];
+  
+  while ((match = regex.exec(rawAttrs)) !== null) {
+    if (match[1]) {
+      // Dynamic prop :prop
+      attrs[match[1]] = match[2];
+    } else if (match[3]) {
+      // Event handler @event
+      attrs[match[3]] = match[4];
+    } else if (match[5]) {
+      // Static prop
+      attrs[match[5]] = match[6];
+    }
   }
+
   return attrs;
 }
+
 
 /**
  * Renders components in HTML
@@ -87,15 +118,17 @@ async function renderClientComponents(html, clientComponents) {
 
   for (const [componentName, { originalPath }] of clientComponents.entries()) {
     const escapedName = componentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
     const componentRegex = new RegExp(
-      `<${escapedName}(?![a-zA-Z0-9_-])\\s*([^>]*?)\\s*(?:\\/>|>\\s*<\\/${escapedName}(?![a-zA-Z0-9_-])>)`,
+      `<${escapedName}\\b((?:\\s+(?:[^\\s>"'=]+(?:=(?:"[^"]*"|'[^']*'|[^\\s"'=<>]+))?))*?)\\s*\\/?>`,
       "gi"
     );
-
+    
     const replacements = [];
     let match;
+    const htmlToProcess = processedHtml;
 
-    while ((match = componentRegex.exec(html)) !== null) {
+    while ((match = componentRegex.exec(htmlToProcess)) !== null) {
       const matchData = {
         name: componentName,
         attrs: parseAttributes(match[1]),
@@ -110,9 +143,9 @@ async function renderClientComponents(html, clientComponents) {
 
     // Render in reverse order to maintain indices
     for (let i = replacements.length - 1; i >= 0; i--) {
-      const { start, end } = replacements[i];
+      const { start, end, attrs } = replacements[i];
 
-      const htmlComponent = await processClientComponent(componentName, originalPath);
+      const htmlComponent = await processClientComponent(componentName, originalPath, attrs);
 
       processedHtml =
         processedHtml.slice(0, start) +

@@ -375,7 +375,7 @@ Future features planned for implementation:
 - [x] **Prefetch Pages** - Automatically prefetch pages on link hover/visibility
 - [x] **Restructure Directories** - Optimize project structure and organization
 - [x] **Auto-generated Files** - Automatic generation of routes, utility files, and configurations based on code and pages directories
-- [ ] **Auto-generated Components** - Automatic generation components only based on pages imports
+- [x] **Auto-generated Components** - Automatic generation components only based on pages imports
 - [x] **Optimize auto generated routes**
 - [ ] **Layouts** - Layouts inside sub routes
 - [ ] **Regeneration in background** - Regenerate page after send response (locks)

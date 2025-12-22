@@ -131,7 +131,6 @@ async function renderAndSendPage({
   context = {},
   route,
 }) {
-  // todo: check if this getPageParhWorks correctly (check with depth in pages)
   const pagePath = getPagePath(pageName);
   const revalidateSeconds = getRevalidateSeconds(route.meta?.revalidate ?? 0);
   const isISR = revalidateSeconds !== 0;

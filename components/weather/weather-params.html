@@ -37,7 +37,6 @@
     status: "idle", // idle | loading | success | error
     data: null,
     error: null,
-    selectedCity: cityParam,
   });
 
   function getWeatherInfo(code) {
@@ -130,26 +129,17 @@
   // this is not a good use of watch, because in a normal component, we wi
   watch(
     () => cityParam,
-    (city) => state.selectedCity = city,
-    { immediate: true }
-  );
-
-  watch(
-    () => state.selectedCity,
     async (city, _, onCleanup) => {
-      if (city === cityParam) return;
 
       const controller = new AbortController();
 
       onCleanup(() => controller.abort());
 
       await fetchWeather(city, controller.signal);
-    }
+    },
+    { immediate: true }
   );
 
-  function changeCity(city) {
-    state.selectedCity = city;
-  }
 
   const currentWeather = computed(() =>
     state.data ? getWeatherInfo(state.data.current?.weatherCode) : null
@@ -164,14 +154,6 @@
       <div>
         <h2 class="text-3xl font-bold mb-2">🌤️ Weather in {{ state.data?.location?.name }}</h2>
         <p class="text-blue-100">Data loaded from client (real-time API)</p>
-      </div>
-
-      <div v-show="!params.city" class="flex flex-wrap gap-2">
-        <button v-for="city in Object.keys(cities)" @click="changeCity(city)"
-          class="px-3 py-2 rounded-lg text-sm font-medium transition-all"
-          :class="state.selectedCity === city ? 'bg-white text-blue-600' : 'bg-blue-600 text-white hover:bg-blue-700'">
-          {{ cities[city]?.name }}
-        </button>
       </div>
     </div>
   </div>
@@ -189,7 +171,7 @@
     <div class="text-red-500 text-4xl mb-4">❌</div>
     <h3 class="text-red-800 font-bold text-lg mb-2">Error al cargar el clima</h3>
     <p class="text-red-600 mb-4">{{ state.error }}</p>
-    <button @click="fetchWeather(state.selectedCity)"
+    <button @click="fetchWeather(cityParam)"
       class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
       Reintentar
     </button>

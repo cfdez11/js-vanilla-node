@@ -20,16 +20,26 @@
    * the component module and calls its `hydrateClientComponent` function.
    *
    * @param {HTMLElement} marker - The <template> or marker element representing a client component.
+   * @param {Object} [props={}] - Optional props to pass to the client component.
    */
-  async function hydrateMarker(marker) {
+  async function hydrateMarker(marker, props = {}) {
     if (marker.dataset.hydrated === "true") return;
     marker.dataset.hydrated = "true";
 
     const componentName = marker.getAttribute("data-client:component");
+    const componentProps = marker.getAttribute("data-client:props");
+
+    let parsedProps = {};
+    try {
+      parsedProps = JSON.parse(componentProps || "{}");
+    } catch (e) {
+      console.warn(`Failed to parse props for component ${componentName}`, e);
+    }
+    const finalProps = { ...parsedProps, ...props };
 
     try {
       const module = await import(`/.app/client/_components/${componentName}.js`);
-      await module.hydrateClientComponent(marker);
+      await module.hydrateClientComponent(marker, finalProps);
     } catch (error) {
       console.error(`Failed to load component: ${componentName}`, error);
     }
@@ -40,13 +50,13 @@
    *
    * @param {HTMLElement|Document} [container=document] - The root container to scan for components.
    */
-  async function hydrateComponents(container = document) {
+  async function hydrateComponents(container = document, props = {}) {
     const markers = container.querySelectorAll(
       "[data-client\\:component]:not([data-hydrated='true'])"
     );
 
     for (const marker of markers) {
-      await hydrateMarker(marker);
+      await hydrateMarker(marker, props);
     }
   }
 
