@@ -1,5 +1,5 @@
 import { compileTemplateToHTML } from "./template.js";
-import { getLayoutTemplate, getOriginalRoutePath, getPageFiles, getRoutePath, saveClientComponentModule, saveClientRoutesFile, saveComponentHtmlDisk, saveServerRoutesFile, readFile, getImportData, generateComponentId, calculateRelativePath, CLIENT_SERVICES_DIR, CLIENT_COMPONENTS_DIR, adjustClientModulePath, PAGES_DIR } from "./files.js";
+import { getOriginalRoutePath, getPageFiles, getRoutePath, saveClientComponentModule, saveClientRoutesFile, saveComponentHtmlDisk, saveServerRoutesFile, readFile, getImportData, generateComponentId, CLIENT_SERVICES_DIR, CLIENT_COMPONENTS_DIR, adjustClientModulePath, PAGES_DIR, ROOT_HTML_DIR, getLayoutPaths, getRelativePath } from "./files.js";
 import { renderComponents } from "./streaming.js";
 import { getRevalidateSeconds } from "./cache.js";
 
@@ -226,6 +226,9 @@ export async function processHtmlFile(filePath) {
  *   res: import("http").ServerResponse,
  *   [key: string]: any
  * }} [context={}]
+ * 
+ * @param {object} [extraComponentData={}]
+ * Additional data to pass to the component during rendering.
  *
  * @returns {Promise<{
  *   html: string,
@@ -240,7 +243,7 @@ export async function processHtmlFile(filePath) {
  *   }>,
  * }>}
  */
-export async function renderHtmlFile(filePath, context = {}) {
+export async function renderHtmlFile(filePath, context = {}, extraComponentData = {}) {
   const {
     getData,
     getMetadata,
@@ -253,7 +256,7 @@ export async function renderHtmlFile(filePath, context = {}) {
 
   const componentData = getData ? await getData(context) : {};
   const metadata = getMetadata ? await getMetadata({ req: context.req, props: componentData }) : null;
-  const html = compileTemplateToHTML(template, componentData);
+  const html = compileTemplateToHTML(template, { ...componentData, ...extraComponentData });
 
   return { html, metadata, clientCode, serverComponents, clientComponents, clientImports };
 }
@@ -304,6 +307,98 @@ function generateClientScriptTags({
 }
 
 /**
+ * Renders a page with server and client components.
+ * @param {string} pagePath 
+ * @param {{
+ *   req: import("http").IncomingMessage,
+ *   res: import("http").ServerResponse,
+ *   [key: string]: any
+ * }} [ctx={}]
+ * @param {boolean} [awaitSuspenseComponents=false]
+ * @param {object} [extraComponentData={}]
+ * @returns {Promise<{
+ *  html: string,
+ *  metadata: object,
+ *  clientCode: string,
+ *  serverComponents: Map<string, any>,
+ *  clientComponents: Map<string, any>,
+ *  suspenseComponents: Array<{ id: string, content: string }>,
+ *  clientComponentsScripts: string[],
+ * }>
+ */
+async function renderPage(pagePath, ctx, awaitSuspenseComponents = false, extraComponentData = {}) {
+  const { 
+    html, 
+    metadata, 
+    clientCode, 
+    serverComponents, 
+    clientComponents,
+  } = await renderHtmlFile(pagePath, ctx, extraComponentData);
+
+  const {
+    html: htmlWithComponents,
+    suspenseComponents,
+    clientComponentsScripts = [],
+  } = await renderComponents({
+    html,
+    serverComponents,
+    clientComponents,
+    awaitSuspenseComponents,
+  });
+
+  return {
+    html: htmlWithComponents,
+    metadata,
+    clientCode,
+    serverComponents,
+    clientComponents,
+    suspenseComponents,
+    clientComponentsScripts,
+  }
+}
+
+/**
+ * Renders nested layouts for a given page.
+ * @param {string} pagePath 
+ * @param {string} pageContent 
+ * @param {object} [pageHead={}] 
+ * @returns {Promise<string>}
+ */
+async function renderLayouts(pagePath, pageContent, pageHead = {}) {
+  const layoutPaths = await getLayoutPaths(pagePath);
+
+  let currentContent = pageContent;
+  let deepMetadata = pageHead.metadata || {};
+
+  // Render layouts from innermost to outermost
+  for (let i = layoutPaths.length - 1; i >= 0; i--) {
+    const layoutPath = layoutPaths[i];
+    
+    try {
+      const { html, metadata } = await renderPage(layoutPath, {}, false, {
+        children: currentContent
+      });
+      
+      deepMetadata = { ...deepMetadata, ...metadata };
+      currentContent = html;
+    } catch (error) {
+      console.warn(`Error rendering ${layoutPath}, skipping`);
+      continue;
+    }
+  }
+
+  // wrap in root
+  const rootTemplate = await readFile(ROOT_HTML_DIR);
+  currentContent = compileTemplateToHTML(rootTemplate, {
+    ...pageHead,
+    metadata: deepMetadata,
+    children: currentContent
+  });
+
+  return currentContent;
+}
+
+/**
  * Renders a page wrapped in the global layout.
  *
  * Supports:
@@ -334,20 +429,16 @@ function generateClientScriptTags({
  * }>}
  */
 export async function renderPageWithLayout(pagePath, ctx = {}, awaitSuspenseComponents = false) {
-  const { html, metadata, clientCode, serverComponents, clientComponents } =
-    await renderHtmlFile(pagePath, ctx);
-
-  // Process server components and suspense
   const {
-    html: processedHtml,
-    suspenseComponents,
-    clientComponentsScripts = [],
-  } = await renderComponents({
-    html,
+    html: pageHtml,
+    metadata,
+    clientCode,
     serverComponents,
     clientComponents,
-    awaitSuspenseComponents,
-  });
+    suspenseComponents,
+    clientComponentsScripts,
+  } = await renderPage(pagePath, ctx, awaitSuspenseComponents);
+
 
   // Wrap in layout
   const clientScripts = generateClientScriptTags({
@@ -356,16 +447,14 @@ export async function renderPageWithLayout(pagePath, ctx = {}, awaitSuspenseComp
     clientComponents,
   });
 
-  const layoutTemplate = await getLayoutTemplate();
-  const fullHtml = compileTemplateToHTML(layoutTemplate, {
-    children: processedHtml,
+  const html = await renderLayouts(pagePath, pageHtml, {
     clientScripts,
     metadata: { ...DEFAULT_METADATA, ...metadata },
-  });
+  })
 
   return {
-    html: fullHtml,
-    pageHtml: processedHtml,
+    html,
+    pageHtml,
     metadata,
     suspenseComponents,
     serverComponents,
@@ -1119,7 +1208,7 @@ async function getRouteFileData(file) {
     return data;
   }
 
-  const componentsBasePath = calculateRelativePath(CLIENT_SERVICES_DIR, CLIENT_COMPONENTS_DIR);
+  const componentsBasePath = getRelativePath(CLIENT_SERVICES_DIR, CLIENT_COMPONENTS_DIR);
 
   // if is static page with paths, create route for each path
   if (paths.length > 0) {

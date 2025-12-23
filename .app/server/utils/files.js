@@ -19,11 +19,12 @@ export const PAGES_DIR = path.resolve(ROOT_DIR, "pages");
 const SERVER_DIR = path.join(ROOT_DIR, ".app",);
 export const CLIENT_DIR = path.join(SERVER_DIR, "client");
 const CLIENT_APP_DIR = CLIENT_DIR;
-const SERVER_APP_DIR = path.join(SERVER_DIR, "server");
+export const SERVER_APP_DIR = path.join(SERVER_DIR, "server");
 const CACHE_DIR = path.join(SERVER_APP_DIR, "_cache");
 export const CLIENT_COMPONENTS_DIR = path.join(CLIENT_APP_DIR, "_components");
 const COMPONENTS_DIR = path.join(ROOT_DIR, "components");
 export const CLIENT_SERVICES_DIR = path.join(CLIENT_APP_DIR, "services");
+export const ROOT_HTML_DIR = path.join(SERVER_APP_DIR, "root.html");
 
 /**
  * Ensures all required application directories exist.
@@ -53,35 +54,6 @@ export async function initializeDirectories() {
   } catch (err) {
     console.error("Failed to create cache directory:", err);
   }
-}
-
-/**
- * Calculates the relative path from one directory to another.
- *
- * @param {string} from - The source directory path.
- * @param {string} to - The target directory path.
- * @returns {string} - `path`: The relative path string (e.g. "../../app/client")
- */
-export function calculateRelativePath(from, to) {
-  if (typeof from !== 'string' || typeof to !== 'string') {
-    throw new TypeError('Both "from" and "to" must be strings.');
-  }
-
-  const fromParts = from.replace(/\/+$/, '').split('/');
-  const toParts = to.replace(/\/+$/, '').split('/');
-
-  // Remove common leading segments
-  while (fromParts.length && toParts.length && fromParts[0] === toParts[0]) {
-    fromParts.shift();
-    toParts.shift();
-  }
-
-  const exitLevels = fromParts.length;
-
-  const upward = exitLevels > 0 ? '../'.repeat(exitLevels) : '';
-  const downward = toParts.join('/');
-
-  return upward + downward;
 }
 
 /**
@@ -128,6 +100,53 @@ export function adjustClientModulePath(modulePath, importStatement) {
     path: adjustedPath,
     importStatement: adjustedImportStatement,
   };
+}
+
+/**
+ * Gets relative path from one directory to another
+ * @param {string} from 
+ * @param {string} to 
+ * @returns {string}
+ */
+export function getRelativePath(from, to) {
+  return path.relative(from, to);
+}
+
+/**
+ * Gets directory name from a file path
+ * @param {string} filePath 
+ * @returns {string}
+ */
+function getDirectoryName(filePath) {
+  return path.dirname(filePath);
+}
+
+
+export async function getLayoutPaths(pagePath) {
+  const layouts = [];
+  const relativePath = getRelativePath(PAGES_DIR, pagePath);
+  const pathSegments = getDirectoryName(relativePath).split(path.sep);
+  
+  // Always start with base layout
+  const baseLayout = path.join(PAGES_DIR, 'layout.html');
+  if (await fileExists(baseLayout)) {
+    layouts.push(baseLayout);
+  }
+  
+  // Add nested layouts based on directory structure
+  let currentPath = PAGES_DIR;
+  for (const segment of pathSegments) {
+    if (segment === '.' || segment === '..') continue;
+    
+    currentPath = path.join(currentPath, segment);
+    const layoutPath = path.join(currentPath, 'layout.html');
+    
+    if (await fileExists(layoutPath)) {
+      layouts.push(layoutPath);
+    }
+  }
+  
+  return layouts;
 }
 
 /**
@@ -281,15 +300,15 @@ export const getPagePath = (pageName) =>
   path.resolve(PAGES_DIR, pageName, "page.html");
 
 /**
- * Retrieves the global layout HTML template.
+ * Retrieves the root HTML template.
  *
  * @async
  * @returns {Promise<string>}
- * Layout HTML content.
+ * Root HTML content.
  */
-export const getLayoutTemplate = async () => {
-  const layoutPath = path.resolve(PAGES_DIR, "layout.html");
-  return await fs.readFile(layoutPath, "utf-8");
+export const getRootTemplate = async () => {
+  const rootPath = path.join(SERVER_APP_DIR, "root.html");
+  return await fs.readFile(rootPath, "utf-8");
 };
 
 /**

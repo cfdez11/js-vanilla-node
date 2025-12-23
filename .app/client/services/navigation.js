@@ -1,7 +1,6 @@
 import { routes } from './_routes.js';
 import { prefetchRouteComponent } from './cache.js';
 import { updateRouteParams } from './useRouteParams.js';
-import './hydrate-client-components.js';
 
 let currentNavigationController = null;
 

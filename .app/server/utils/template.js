@@ -28,6 +28,26 @@ function isEmptyTextNode(node) {
 }
 
 /**
+ * Parses HTML string and returns DOM nodes
+ * @param {string} html
+ * @returns {ChildNode[]}
+ */
+function parseHTMLToNodes(html) {
+  try {
+    const cleanHtml = html
+      .replace(/[\r\n\t]+/g, " ")
+      .replace(/ +/g, " ")
+      .trim();
+    const dom = parseDocument(cleanHtml, { xmlMode: true });
+    return DomUtils.getChildren(dom);
+  } catch (error) {
+    console.error('Error parsing HTML:', error);
+    return [];
+  }
+}
+
+
+/**
  * Processes an HTML file to extract script, template, metadata, client code, and component registry
  * @param {ChildNode} node
  * @param {Object} scope
@@ -172,16 +192,8 @@ function processNode(node, scope, previousRendered = false) {
  */
 export function compileTemplateToHTML(template, data = {}) {
   try {
-    const cleanTemplate = template
-      .replace(/[\r\n\t]+/g, " ")
-      .replace(/ +/g, " ")
-      .trim();
-
-    // Parse HTML using xmlMode to preserve case
-    const dom = parseDocument(cleanTemplate, { xmlMode: true });
-
-    const children = DomUtils.getChildren(dom);
-    const processed = children
+    const nodes = parseHTMLToNodes(template);
+    const processed = nodes
       .map((n) => processNode(n, data))
       .flat()
       .filter(Boolean);
