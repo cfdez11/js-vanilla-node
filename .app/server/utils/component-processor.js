@@ -376,7 +376,9 @@ async function renderLayouts(pagePath, pageContent, pageHead = {}) {
     
     try {
       const { html, metadata } = await renderPage(layoutPath, {}, false, {
-        children: currentContent
+        props: {
+          children: currentContent
+        }
       });
       
       deepMetadata = { ...deepMetadata, ...metadata };
@@ -392,7 +394,9 @@ async function renderLayouts(pagePath, pageContent, pageHead = {}) {
   currentContent = compileTemplateToHTML(rootTemplate, {
     ...pageHead,
     metadata: deepMetadata,
-    children: currentContent
+    props: {
+      children: currentContent
+    }
   });
 
   return currentContent;
@@ -699,6 +703,8 @@ export async function generateClientComponentModule({
       }
 
       effect(() => render());
+
+      return root;
     }
   `;
 
@@ -921,6 +927,8 @@ function computeProps(clientCode, componentProps) {
  * Replaces vprops(...) by const props = { ... };
  * @param {string} clientCode
  * @param {object} componentProps
+ * 
+ * @returns {string}
  */
 function addComputedProps(clientCode, componentProps) {
   const vpropsRegex = /const\s+props\s*=\s*vprops\s*\([\s\S]*?\)\s*;?/;
@@ -1113,8 +1121,7 @@ async function generateComponentAndFillCache(filePath) {
  * Build completion message.
  */
 export async function generateComponentsAndFillCache() {
-  // Read all .html files in components and pages directory, go dee
-  const pagesFiles = await getPageFiles();
+  const pagesFiles = await getPageFiles({ layouts: true });
 
   const generateComponentsPromises = pagesFiles.map((file) =>
     generateComponentAndFillCache(file.fullpath)
@@ -1170,7 +1177,13 @@ async function getRouteFileData(file) {
     serverRoutes: [],
     clientRoutes: [],
   }
-  const { getData, getMetadata, getStaticPaths, serverComponents } = await processHtmlFile(file.fullpath);
+
+  const [ processedFileData, layoutPaths ]= await Promise.all([
+    processHtmlFile(file.fullpath),
+    getLayoutPaths(file.fullpath),
+  ]);
+
+  const { getData, getMetadata, getStaticPaths, serverComponents } = processedFileData;
 
   const filePath = getOriginalRoutePath(file.fullpath);
   const urlPath = getRoutePath(file.fullpath);
@@ -1210,6 +1223,15 @@ async function getRouteFileData(file) {
 
   const componentsBasePath = getRelativePath(CLIENT_SERVICES_DIR, CLIENT_COMPONENTS_DIR);
 
+  const layoutsImportData = layoutPaths.map((layoutPath) => {
+    const urlPath = getRoutePath(layoutPath);
+    const layoutComponentName = generateComponentId(urlPath);
+    return ({
+      name: layoutComponentName,
+      importPath: `${componentsBasePath}/${layoutComponentName}.js`,
+    })
+  });
+
   // if is static page with paths, create route for each path
   if (paths.length > 0) {
     for (const pathObj of paths) {
@@ -1224,6 +1246,7 @@ async function getRouteFileData(file) {
 
           return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
         },
+        layouts: ${JSON.stringify(layoutsImportData)},
         meta: {
           ssr: false,
           requiresAuth: false,
@@ -1240,7 +1263,8 @@ async function getRouteFileData(file) {
         const mod = await loadRouteComponent("${urlPath}", () => import("${importPath}"));
         
         return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
-        },
+      },
+      layouts: ${JSON.stringify(layoutsImportData)},
       meta: {
         ssr: false,
         requiresAuth: false,

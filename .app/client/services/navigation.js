@@ -3,6 +3,8 @@ import { prefetchRouteComponent } from './cache.js';
 import { updateRouteParams } from './useRouteParams.js';
 
 let currentNavigationController = null;
+const layoutsRendered = new Set(); // todo: track rendered layouts across navigations
+
 
 /**
  * Converts a route path with parameters (e.g., '/page/:city/:team') into a RegExp
@@ -175,24 +177,48 @@ function addMetadata(metadata) {
  */
 export async function renderPage(route, path) {
   if (!route?.component) return;
+  const pageModule = await route.component();
 
-  const { hydrateClientComponent, metadata } = await route.component();
+  if (!pageModule.hydrateClientComponent) return;
 
-  if (!hydrateClientComponent) return;
+  const layouts = route.layouts || [];
+  const layoutsToRender = layouts.toReversed();
+  // .filter(l => !layoutsRendered.has(l.name));
+  const layoutsModules = await Promise.all(
+    layoutsToRender.map((layout) => import(layout.importPath))
+  );
 
-  const main = document.querySelector('main');
-  if (!main) return;
+  const appRootElement = document.getElementById('app-root') || document.body;
+  if (!appRootElement) return;
 
-  main.innerHTML = '';
+  // Clear existing content
+  appRootElement.innerHTML = '';
+  
+  // generate page HTML
+  const pageMarker = document.createElement('template');
+  const pageNode = pageModule.hydrateClientComponent(pageMarker);
 
-  const marker = document.createElement('template');
-  main.appendChild(marker);
+  let deepestMetadata = pageModule.metadata;
+  let htmlContainerNode = pageNode;
 
-  hydrateClientComponent(marker);
+  for (let i = layoutsModules.length - 1; i >= 0; i--) {
+    const mod = layoutsModules[i];
+    const layoutMarker = document.createElement('template');
+    const containerRootNode = mod.hydrateClientComponent(layoutMarker, { children: htmlContainerNode });
+    if(!deepestMetadata && mod.metadata) {
+      deepestMetadata = mod.metadata;
+    }
 
-  if (metadata) {
-    addMetadata(metadata);
+    htmlContainerNode = containerRootNode;
   }
+
+  // update DOM
+  appRootElement.appendChild(htmlContainerNode);
+  if (deepestMetadata) {
+    addMetadata(deepestMetadata);
+  }
+
+  layoutsToRender.forEach(l => layoutsRendered.add(l.name));
 
   hydrateComponents(); // global function from hydrate-client-components.js
 }

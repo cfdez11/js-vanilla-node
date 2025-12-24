@@ -121,7 +121,17 @@ function getDirectoryName(filePath) {
   return path.dirname(filePath);
 }
 
-
+/**
+ * Retrieves layout file paths for a given page.
+ *
+ * Layouts are determined by traversing up the directory tree
+ * from the page's location to the pages root, collecting any
+ * `layout.html` files found along the way.
+ *
+ * @async
+ * @param {string} pagePath 
+ * @returns {Promise<string[]>}
+ */
 export async function getLayoutPaths(pagePath) {
   const layouts = [];
   const relativePath = getRelativePath(PAGES_DIR, pagePath);
@@ -576,14 +586,19 @@ export function getOriginalRoutePath(filePath) {
 
 /**
  * Retrieves all page files (`page.html`) in the pages directory.
- *
+ * Optionally includes layout files (`layout.html`).
+ * 
+ * @param {Object} [options]
+ * @param {boolean} [options.layouts=false]
+ * Whether to include layout files in the results.
+ * 
  * @async
  * @returns {Promise<Array<{ fullpath: string, path: string }>>}
  */
-export async function getPageFiles() {
+export async function getPageFiles({ layouts = false } = {}) {
   const pageFiles = await readDirectoryRecursive(PAGES_DIR);
   const htmlFiles = pageFiles.filter((file) =>
-    file.fullpath.endsWith("page.html")
+    file.fullpath.endsWith("page.html") || (layouts && file.name === "layout.html")
   );
 
   return htmlFiles;
