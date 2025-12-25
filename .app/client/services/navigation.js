@@ -1,15 +1,15 @@
-import { routes } from './_routes.js';
-import { prefetchRouteComponent } from './cache.js';
-import { updateRouteParams } from './useRouteParams.js';
+import { routes } from "./_routes.js";
+import { prefetchRouteComponent } from "./cache.js";
+import { createLayoutRenderer } from "./layouts.js";
+import { updateRouteParams } from "./useRouteParams.js";
 
 let currentNavigationController = null;
-const layoutsRendered = new Set(); // todo: track rendered layouts across navigations
-
+const layoutRenderer = createLayoutRenderer();
 
 /**
  * Converts a route path with parameters (e.g., '/page/:city/:team') into a RegExp
  * and captures the parameter names.
- * 
+ *
  * @param {string} routePath - The route path to convert
  * @returns {{regex: RegExp, keys: string[]}} The generated RegExp and parameter keys
  */
@@ -17,11 +17,11 @@ function pathToRegex(routePath) {
   const keys = [];
   const regex = new RegExp(
     "^" +
-    routePath.replace(/:([^/]+)/g, (_, key) => {
-      keys.push(key);
-      return "([^/]+)";
-    }) +
-    "$"
+      routePath.replace(/:([^/]+)/g, (_, key) => {
+        keys.push(key);
+        return "([^/]+)";
+      }) +
+      "$"
   );
   return { regex, keys };
 }
@@ -29,7 +29,7 @@ function pathToRegex(routePath) {
 /**
  * Finds a route that matches the given path and extracts route parameters.
  * Always returns an object with `route` and `params`.
- * 
+ *
  * @param {string} path - The URL path to match (e.g., '/page/madrid/barcelona')
  * @returns {MatchedRoute} An object containing the matched route and params
  */
@@ -60,24 +60,27 @@ function findRouteWithParams(path) {
  * for links marked with `data-prefetch` when they enter the viewport.
  */
 function setupPrefetchObserver() {
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (!entry.isIntersecting) return;
-      const link = entry.target;
-      if (!link.hasAttribute('data-prefetch')) return;
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        const link = entry.target;
+        if (!link.hasAttribute("data-prefetch")) return;
 
-      const url = new URL(link.href, window.location.origin);
+        const url = new URL(link.href, window.location.origin);
 
-      const route = routes.find(r => r.path === url.pathname);
+        const route = routes.find((r) => r.path === url.pathname);
 
-      if (!route?.component) return;
+        if (!route?.component) return;
 
-      prefetchRouteComponent(route.path, route.component);
-      observer.unobserve(link);
-    });
-  }, { rootMargin: '200px' });
+        prefetchRouteComponent(route.path, route.component);
+        observer.unobserve(link);
+      });
+    },
+    { rootMargin: "200px" }
+  );
 
-  document.querySelectorAll('a[data-prefetch]').forEach((link) => {
+  document.querySelectorAll("a[data-prefetch]").forEach((link) => {
     if (!link.__prefetchObserved) {
       link.__prefetchObserved = true;
       observer.observe(link);
@@ -94,12 +97,13 @@ function setupPrefetchObserver() {
  * Must be called after DOMContentLoaded.
  */
 export function initializeRouter() {
-  window.addEventListener('popstate', () => {
+  window.addEventListener("popstate", () => {
     navigate(location.pathname, false);
   });
 
   setupPrefetchObserver();
   setupLinkInterceptor();
+  layoutRenderer.reset();
 
   // Perform initial navigation if is not SSR
   const { route } = findRouteWithParams(location.pathname);
@@ -116,13 +120,13 @@ export function initializeRouter() {
  * are ignored.
  */
 function setupLinkInterceptor() {
-  document.addEventListener('click', (event) => {
-    const link = event.target.closest('a');
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest("a");
     if (!link) return;
 
-    const href = link.getAttribute('href');
+    const href = link.getAttribute("href");
 
-    if (!href || href.startsWith('#')) return;
+    if (!href || href.startsWith("#")) return;
 
     const url = new URL(href, window.location.origin);
     const isExternal = url.origin !== window.location.origin;
@@ -131,8 +135,8 @@ function setupLinkInterceptor() {
     if (
       isExternal ||
       forceReload ||
-      link.target === '_blank' ||
-      link.rel === 'external'
+      link.target === "_blank" ||
+      link.rel === "external"
     ) {
       return;
     }
@@ -159,8 +163,8 @@ function addMetadata(metadata) {
     let descriptionMeta = document.querySelector('meta[name="description"]');
 
     if (!descriptionMeta) {
-      descriptionMeta = document.createElement('meta');
-      descriptionMeta.name = 'description';
+      descriptionMeta = document.createElement("meta");
+      descriptionMeta.name = "description";
       document.head.appendChild(descriptionMeta);
     }
 
@@ -171,7 +175,7 @@ function addMetadata(metadata) {
 /**
  * Renders a route component into the main container.
  *
- * @param {Object} route - The route object.
+ * @param {import('./_routes.js').Route} route - The route object.
  * @param {string} path - The route path.
  * @returns {Promise<void>}
  */
@@ -181,44 +185,31 @@ export async function renderPage(route, path) {
 
   if (!pageModule.hydrateClientComponent) return;
 
-  const layouts = route.layouts || [];
-  const layoutsToRender = layouts.toReversed();
-  // .filter(l => !layoutsRendered.has(l.name));
-  const layoutsModules = await Promise.all(
-    layoutsToRender.map((layout) => import(layout.importPath))
-  );
-
-  const appRootElement = document.getElementById('app-root') || document.body;
+  const appRootElement = document.getElementById("app-root") || document.body;
   if (!appRootElement) return;
 
-  // Clear existing content
-  appRootElement.innerHTML = '';
-  
   // generate page HTML
-  const pageMarker = document.createElement('template');
+  const pageMarker = document.createElement("template");
   const pageNode = pageModule.hydrateClientComponent(pageMarker);
 
-  let deepestMetadata = pageModule.metadata;
-  let htmlContainerNode = pageNode;
-
-  for (let i = layoutsModules.length - 1; i >= 0; i--) {
-    const mod = layoutsModules[i];
-    const layoutMarker = document.createElement('template');
-    const containerRootNode = mod.hydrateClientComponent(layoutMarker, { children: htmlContainerNode });
-    if(!deepestMetadata && mod.metadata) {
-      deepestMetadata = mod.metadata;
-    }
-
-    htmlContainerNode = containerRootNode;
-  }
+  const { node, layoutId, metadata } = await layoutRenderer.generate({
+    routeLayouts: route.layouts,
+    pageNode,
+    metadata: pageModule.metadata,
+  });
 
   // update DOM
-  appRootElement.appendChild(htmlContainerNode);
-  if (deepestMetadata) {
-    addMetadata(deepestMetadata);
+
+  if (layoutId) {
+    layoutRenderer.patch(layoutId, node);
+  } else {
+    appRootElement.innerHTML = "";
+    appRootElement.appendChild(node);
   }
 
-  layoutsToRender.forEach(l => layoutsRendered.add(l.name));
+  if (metadata) {
+    addMetadata(metadata);
+  }
 
   hydrateComponents(); // global function from hydrate-client-components.js
 }
@@ -228,7 +219,7 @@ export async function renderPage(route, path) {
  * Performs history push and renders the page component.
  *
  * Updates route params store on navigation.
- * 
+ *
  * Control of ongoing navigations with AbortController
  * @param {string} path - The target route path.
  * @param {boolean} [addToHistory=true] - Whether to push to history stack.
@@ -244,42 +235,41 @@ export async function navigate(path, addToHistory = true) {
 
   updateRouteParams(path);
 
-  const routePath = path.split('?')[0];
+  const routePath = path.split("?")[0];
   const { route } = findRouteWithParams(routePath);
 
   if (addToHistory) {
-    history.pushState({}, '', path);
+    history.pushState({}, "", path);
   }
 
   try {
     if (route?.meta?.ssr) {
       await renderSSRPage(path, controller.signal);
       return;
-    };
+    }
 
     if (route?.meta?.requiresAuth && !app.Store?.loggedIn) {
-      navigate('/account/login');
+      navigate("/account/login");
       return;
     }
 
     if (route?.meta?.accessOnly && app.Store?.loggedIn) {
-      navigate('/account');
+      navigate("/account");
       return;
     }
 
     renderPage(route, routePath);
   } catch (e) {
-    if (e.name === 'AbortError') {
-      console.log('Navigation aborted due to route change');
+    if (e.name === "AbortError") {
+      console.log("Navigation aborted due to route change");
       return;
     }
-    console.error('Navigation error:', e);
+    console.error("Navigation error:", e);
   } finally {
     if (currentNavigationController === controller) {
       currentNavigationController = null;
     }
   }
-
 }
 
 /**
@@ -290,15 +280,18 @@ export async function navigate(path, addToHistory = true) {
  * @throws {Error} If the response body is not readable or the <main> element is missing.
  */
 async function renderSSRPage(path, signal) {
+  // clean up layoutsRendered for next CSR navigation
+  layoutRenderer.reset();
+
   const response = await fetch(path, { signal });
-  if (!response.body) throw new Error('Invalid response body');
+  if (!response.body) throw new Error("Invalid response body");
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let htmlBuffer = '';
+  let htmlBuffer = "";
 
-  const mainEl = document.querySelector('main');
-  if (!mainEl) throw new Error('<main> element not found');
+  const mainEl = document.querySelector("main");
+  if (!mainEl) throw new Error("<main> element not found");
 
   const parser = new DOMParser();
 
@@ -326,8 +319,8 @@ async function renderSSRPage(path, signal) {
 function processSSRMain(buffer, parser, mainEl) {
   const mainMatch = buffer.match(/<main[\s\S]*?<\/main>/i);
   if (mainMatch) {
-    const mainDoc = parser.parseFromString(mainMatch[0], 'text/html');
-    const newMain = mainDoc.querySelector('main');
+    const mainDoc = parser.parseFromString(mainMatch[0], "text/html");
+    const newMain = mainDoc.querySelector("main");
 
     if (newMain) {
       mainEl.innerHTML = newMain.innerHTML;
@@ -349,12 +342,14 @@ function processSSRTemplates(buffer, parser) {
   const templateRegex = /<template[\s\S]*?<\/template>/gi;
   let match;
   while ((match = templateRegex.exec(buffer)) !== null) {
-    const tempDoc = parser.parseFromString(match[0], 'text/html').querySelector('template');
+    const tempDoc = parser
+      .parseFromString(match[0], "text/html")
+      .querySelector("template");
     if (tempDoc && !document.getElementById(tempDoc.id)) {
       document.body.appendChild(tempDoc.cloneNode(true));
     }
   }
-  const closeTemplateTag = '</template>';
+  const closeTemplateTag = "</template>";
   const lastIndex = buffer.lastIndexOf(closeTemplateTag);
   if (lastIndex !== -1) {
     return buffer.slice(lastIndex + closeTemplateTag.length);
@@ -372,18 +367,24 @@ function processSSRScripts(buffer, parser) {
   const scriptRegex = /<script[\s\S]*?<\/script>/gi;
   let match;
   while ((match = scriptRegex.exec(buffer)) !== null) {
-    const scriptEl = parser.parseFromString(match[0], 'text/html').querySelector('script');
+    const scriptEl = parser
+      .parseFromString(match[0], "text/html")
+      .querySelector("script");
     if (!scriptEl) continue;
 
     // Hydration scripts for Suspense
     if (scriptEl.dataset.target && scriptEl.dataset.source) {
       const targetId = scriptEl.dataset.target;
       const sourceId = scriptEl.dataset.source;
-      const existScript = document.querySelector(`script[data-target="${targetId}"][data-source="${sourceId}"]`);
+      const existScript = document.querySelector(
+        `script[data-target="${targetId}"][data-source="${sourceId}"]`
+      );
 
       if (!existScript) {
-        const newScript = document.createElement('script');
-        Object.keys(scriptEl.dataset).forEach(k => newScript.dataset[k] = scriptEl.dataset[k]);
+        const newScript = document.createElement("script");
+        Object.keys(scriptEl.dataset).forEach(
+          (k) => (newScript.dataset[k] = scriptEl.dataset[k])
+        );
         newScript.src = scriptEl.src;
         newScript.async = true;
         const templateEl = document.getElementById(sourceId);
@@ -397,8 +398,12 @@ function processSSRScripts(buffer, parser) {
     // External scripts
     else if (scriptEl.src) {
       const srcPath = new URL(scriptEl.src, window.location.origin).pathname;
-      if (!Array.from(document.scripts).some(s => new URL(s.src, window.location.origin).pathname === srcPath)) {
-        const newScript = document.createElement('script');
+      if (
+        !Array.from(document.scripts).some(
+          (s) => new URL(s.src, window.location.origin).pathname === srcPath
+        )
+      ) {
+        const newScript = document.createElement("script");
         newScript.src = scriptEl.src;
         newScript.async = true;
         document.head.appendChild(newScript);
@@ -409,12 +414,12 @@ function processSSRScripts(buffer, parser) {
       try {
         new Function(scriptEl.textContent)();
       } catch (e) {
-        console.error('Error executing inline script:', e);
+        console.error("Error executing inline script:", e);
       }
     }
   }
 
-  const lastIndex = buffer.lastIndexOf('</script>');
+  const lastIndex = buffer.lastIndexOf("</script>");
   if (lastIndex !== -1) return buffer.slice(lastIndex + 9);
   return buffer;
 }
@@ -425,9 +430,9 @@ function processSSRScripts(buffer, parser) {
  * @param {DOMParser} parser - DOMParser instance.
  */
 function updateSSRMetadata(buffer, parser) {
-  const tempDoc = parser.parseFromString(buffer, 'text/html');
+  const tempDoc = parser.parseFromString(buffer, "text/html");
 
-  const titleEl = tempDoc.querySelector('title');
+  const titleEl = tempDoc.querySelector("title");
   if (titleEl) {
     document.title = titleEl.textContent;
   }
@@ -436,14 +441,13 @@ function updateSSRMetadata(buffer, parser) {
   if (metaDesc) {
     let meta = document.querySelector('meta[name="description"]');
     if (!meta) {
-      meta = document.createElement('meta');
-      meta.name = 'description';
+      meta = document.createElement("meta");
+      meta.name = "description";
       document.head.appendChild(meta);
     }
     meta.content = metaDesc.content;
   }
 }
-
 
 /**
  * Parses the URL search string into a plain object.
@@ -460,14 +464,14 @@ function updateSSRMetadata(buffer, parser) {
  * @returns {Object.<string, string>}
  */
 function parseRawQuery(search) {
-  const out = {}
-  const qs = new URLSearchParams(search)
+  const out = {};
+  const qs = new URLSearchParams(search);
 
   for (const [k, v] of qs.entries()) {
-    out[k] = v
+    out[k] = v;
   }
 
-  return out
+  return out;
 }
 
 /**
@@ -483,17 +487,16 @@ function parseRawQuery(search) {
  * @returns {string} Query string without leading "?"
  */
 function buildQueryString(raw) {
-  const qs = new URLSearchParams()
+  const qs = new URLSearchParams();
 
   for (const k in raw) {
     if (raw[k] != null) {
-      qs.set(k, String(raw[k]))
+      qs.set(k, String(raw[k]));
     }
   }
 
-  return qs.toString()
+  return qs.toString();
 }
-
 
 /**
  * Manages URL query parameters as application state.
@@ -521,26 +524,22 @@ function buildQueryString(raw) {
  * @returns {Object}
  */
 export function useQueryParams(options = {}) {
-  const {
-    schema = {},
-    replace = false,
-    listen = true
-  } = options
+  const { schema = {}, replace = false, listen = true } = options;
 
   /**
    * Compute default values by executing schema parsers
    * with an undefined input.
    */
-  const defaults = {}
+  const defaults = {};
   for (const key in schema) {
-    defaults[key] = schema[key](undefined)
+    defaults[key] = schema[key](undefined);
   }
 
   /**
    * Raw query params as strings.
    * This mirrors exactly what exists in the URL.
    */
-  let raw = parseRawQuery(window.location.search)
+  let raw = parseRawQuery(window.location.search);
 
   /**
    * Parses raw query params using the provided schema.
@@ -552,22 +551,22 @@ export function useQueryParams(options = {}) {
    * @returns {Object} Parsed params ready for application use
    */
   function parseWithSchema(raw) {
-    const parsed = {}
+    const parsed = {};
 
     // Apply schema parsing and defaults
     for (const key in schema) {
-      const parser = schema[key]
-      parsed[key] = parser(raw[key])
+      const parser = schema[key];
+      parsed[key] = parser(raw[key]);
     }
 
     // Preserve non-declared query params
     for (const key in raw) {
       if (!(key in parsed)) {
-        parsed[key] = raw[key]
+        parsed[key] = raw[key];
       }
     }
 
-    return parsed
+    return parsed;
   }
 
   /**
@@ -581,19 +580,19 @@ export function useQueryParams(options = {}) {
    * @returns {Object.<string, string>}
    */
   function serializeWithSchema(next) {
-    const out = {}
+    const out = {};
 
     for (const key in next) {
-      const value = next[key]
+      const value = next[key];
 
       if (Array.isArray(value)) {
-        out[key] = value.join(',')
+        out[key] = value.join(",");
       } else if (value != null) {
-        out[key] = String(value)
+        out[key] = String(value);
       }
     }
 
-    return out
+    return out;
   }
 
   /**
@@ -602,15 +601,13 @@ export function useQueryParams(options = {}) {
    * @param {Object.<string, string>} nextRaw
    */
   function sync(nextRaw) {
-    raw = nextRaw
+    raw = nextRaw;
 
-    const qs = buildQueryString(raw)
+    const qs = buildQueryString(raw);
     const url =
-      window.location.pathname +
-      (qs ? `?${qs}` : '') +
-      window.location.hash
+      window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash;
 
-    history[replace ? 'replaceState' : 'pushState'](null, '', url)
+    history[replace ? "replaceState" : "pushState"](null, "", url);
   }
 
   /**
@@ -621,8 +618,8 @@ export function useQueryParams(options = {}) {
    * @param {Object} next
    */
   function set(next) {
-    const serialized = serializeWithSchema(next)
-    sync({ ...raw, ...serialized })
+    const serialized = serializeWithSchema(next);
+    sync({ ...raw, ...serialized });
   }
 
   /**
@@ -631,16 +628,16 @@ export function useQueryParams(options = {}) {
    * @param {...string} keys
    */
   function remove(...keys) {
-    const next = { ...raw }
-    keys.forEach(k => delete next[k])
-    sync(next)
+    const next = { ...raw };
+    keys.forEach((k) => delete next[k]);
+    sync(next);
   }
 
   /**
    * Removes all query params from the URL.
    */
   function reset() {
-    sync({})
+    sync({});
   }
 
   /**
@@ -648,9 +645,9 @@ export function useQueryParams(options = {}) {
    * back/forward navigation.
    */
   if (listen) {
-    window.addEventListener('popstate', () => {
-      raw = parseRawQuery(window.location.search)
-    })
+    window.addEventListener("popstate", () => {
+      raw = parseRawQuery(window.location.search);
+    });
   }
 
   return {
@@ -661,7 +658,7 @@ export function useQueryParams(options = {}) {
      * from the current raw URL state.
      */
     get params() {
-      return parseWithSchema(raw)
+      return parseWithSchema(raw);
     },
 
     /**
@@ -669,12 +666,11 @@ export function useQueryParams(options = {}) {
      * Exposed mainly for debugging or tooling.
      */
     get raw() {
-      return { ...raw }
+      return { ...raw };
     },
 
     set,
     remove,
-    reset
-  }
+    reset,
+  };
 }
-

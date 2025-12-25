@@ -547,8 +547,9 @@ export async function saveClientRoutesFile(clientRoutes) {
      * @property {string} path
      * @property {string} serverPath
      * @property {boolean} isNotFound
-     * @property {(marker: HTMLElement) => { render: (marker: string) => void, metadata: any}} [component]
+     * @property {(marker: HTMLElement) => Promise<{ render: (marker: string) => void, metadata: any}>} [component]
      * @property {RouteMeta} meta
+     * @property {Array<{ name: string, importPath: string }>} [layouts]
      */
   `;
   const clientFileCode = `
