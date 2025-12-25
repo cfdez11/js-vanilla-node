@@ -9,7 +9,7 @@
 <script client>
   import Weather from "components/weather/weather-params.html";
   import WeatherLinks from "components/weather/weather-links.html";
-  import { useRouteParams } from ".app/useRouteParams.js";
+  import { useRouteParams } from ".app/navigation/index.js";
 
   const params = useRouteParams();
   const cityParam = params.city || "madrid";

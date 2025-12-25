@@ -13,8 +13,9 @@ import { loadRouteComponent } from './cache.js';
      * @property {string} path
      * @property {string} serverPath
      * @property {boolean} isNotFound
-     * @property {(marker: HTMLElement) => { render: (marker: string) => void, metadata: any}} [component]
+     * @property {(marker: HTMLElement) => Promise<{ render: (marker: string) => void, metadata: any}>} [component]
      * @property {RouteMeta} meta
+     * @property {Array<{ name: string, importPath: string }>} [layouts]
      */
   
     export const routes = [
@@ -31,7 +32,8 @@ import { loadRouteComponent } from './cache.js';
         const mod = await loadRouteComponent("/not-found", () => import("../_components/_not_found_38fcb039.js"));
         
         return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
-        },
+      },
+      layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
       meta: {
         ssr: false,
         requiresAuth: false,
@@ -43,7 +45,8 @@ import { loadRouteComponent } from './cache.js';
         const mod = await loadRouteComponent("/page-csr/:city", () => import("../_components/_page_csr_city_3aa0994b.js"));
         
         return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
-        },
+      },
+      layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
       meta: {
         ssr: false,
         requiresAuth: false,
@@ -55,7 +58,8 @@ import { loadRouteComponent } from './cache.js';
         const mod = await loadRouteComponent("/page-csr", () => import("../_components/_page_csr_f4051c9e.js"));
         
         return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
-        },
+      },
+      layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
       meta: {
         ssr: false,
         requiresAuth: false,
@@ -68,6 +72,7 @@ import { loadRouteComponent } from './cache.js';
 
           return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
         },
+        layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
         meta: {
           ssr: false,
           requiresAuth: false,
@@ -80,6 +85,7 @@ import { loadRouteComponent } from './cache.js';
 
           return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
         },
+        layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
         meta: {
           ssr: false,
           requiresAuth: false,
@@ -92,6 +98,7 @@ import { loadRouteComponent } from './cache.js';
 
           return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
         },
+        layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
         meta: {
           ssr: false,
           requiresAuth: false,
@@ -104,6 +111,7 @@ import { loadRouteComponent } from './cache.js';
 
           return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
         },
+        layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
         meta: {
           ssr: false,
           requiresAuth: false,
@@ -116,6 +124,7 @@ import { loadRouteComponent } from './cache.js';
 
           return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
         },
+        layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
         meta: {
           ssr: false,
           requiresAuth: false,
@@ -128,6 +137,7 @@ import { loadRouteComponent } from './cache.js';
 
           return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
         },
+        layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
         meta: {
           ssr: false,
           requiresAuth: false,
@@ -153,7 +163,8 @@ import { loadRouteComponent } from './cache.js';
         const mod = await loadRouteComponent("/static", () => import("../_components/_static_de6e0f62.js"));
         
         return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
-        },
+      },
+      layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"},{"name":"_static_layout_b5e4107f","importPath":"../_components/_static_layout_b5e4107f.js"}],
       meta: {
         ssr: false,
         requiresAuth: false,
@@ -165,7 +176,8 @@ import { loadRouteComponent } from './cache.js';
         const mod = await loadRouteComponent("/static-with-data", () => import("../_components/_static_with_data_a0acd4a0.js"));
         
         return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
-        },
+      },
+      layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
       meta: {
         ssr: false,
         requiresAuth: false,

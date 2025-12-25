@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+
+<head>
+  <meta charset="UTF-8">
+  <title>{{metadata.title}}</title>
+  <meta name="description" content="{{metadata.description}}">
+  <link rel="icon" href="/.app/client/favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="/.app/client/styles.css">
+  <script type="module" src="/.app/client/services/index.js"></script>
+  <script type="module" src="/.app/client/services/index.js"></script>
+  <script src="/.app/client/services/hydrate-client-components.js"></script>
+  {{clientScripts}}
+</head>
+
+<body class="h-full flex flex-col bg-gray-50">
+  <div id="app-root" class="grow flex flex-col">
+    {{props.children}}
+  </div>
+</body>
+</html>
