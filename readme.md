@@ -134,7 +134,7 @@ Server components are rendered on the backend. They are defined with the `s-` pr
 // server/components/user-card.js
 export default async function UserCard({ userId }) {
   const user = await fetch(`https://api.example.com/users/${userId}`).then(
-    (res) => res.json(),
+    (res) => res.json()
   );
 
   return `
@@ -381,7 +381,7 @@ Future features planned for implementation:
 - [x] **Auto-generated Files** - Automatic generation of routes, utility files, and configurations based on code and pages directories
 - [x] **Auto-generated Components** - Automatic generation components only based on pages imports
 - [x] **Optimize auto generated routes**
-- [ ] **Layouts** - Layouts inside sub routes
+- [x] **Layouts** - Layouts inside sub routes
 - [ ] **Regeneration in background** - Regenerate page after send response (locks)
 - [ ] **Change syntax**
 - [ ] **Create NPM extension package** - Extension to recognize sintax
