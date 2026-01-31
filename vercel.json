@@ -1,6 +1,7 @@
 {
   "buildCommand": "pnpm run build",
   "installCommand": "pnpm install",
+  "outputDirectory": ".app/client",
   "framework": null,
   "rewrites": [
     {
