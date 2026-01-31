@@ -1,1 +1,4 @@
-export { default } from "../.app/server/index.js";
+import app from "../.app/server/index.js";
+
+// Vercel serverless function export
+export default app;
