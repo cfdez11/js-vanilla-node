@@ -4,6 +4,9 @@
   "description": "",
   "type": "module",
   "main": "index.js",
+  "imports": {
+    "#app/*": "./.app/*"
+  },
   "scripts": {
     "start": "node .app/server/index.js",
     "dev": "run-p dev:*",
