@@ -6,34 +6,125 @@
 
 A minimalist vanilla JavaScript framework with support for Server-Side Rendering (SSR), Client-Side Rendering (CSR), reactive components, and streaming with suspense.
 
-## 📁 Project Structure
+## � Table of Contents
+
+- [Vanilla JS Framework](#vanilla-js-framework)
+  - [� Table of Contents](#-table-of-contents)
+  - [✨ Key Features](#-key-features)
+  - [�📁 Project Structure](#-project-structure)
+  - [🚀 Quick Start](#-quick-start)
+  - [📄 Creating a Page](#-creating-a-page)
+  - [🧩 Components](#-components)
+    - [Component Structure](#component-structure)
+    - [Server Components](#server-components)
+    - [Using Components](#using-components)
+  - [🎭 Rendering Strategies](#-rendering-strategies)
+    - [SSR - Server-Side Rendering](#ssr---server-side-rendering)
+    - [CSR - Client-Side Rendering](#csr---client-side-rendering)
+    - [SSG - Static Site Generation](#ssg---static-site-generation)
+    - [ISR - Incremental Static Regeneration](#isr---incremental-static-regeneration)
+  - [📐 Layouts](#-layouts)
+    - [Root Layout](#root-layout)
+    - [Custom Nested Layouts](#custom-nested-layouts)
+  - [⏳ Suspense (Streaming)](#-suspense-streaming)
+  - [🔄 Reactive System](#-reactive-system)
+  - [📝 Template Syntax](#-template-syntax)
+    - [Interpolation](#interpolation)
+    - [Conditionals](#conditionals)
+    - [Lists](#lists)
+    - [Event Handlers](#event-handlers)
+    - [Attributes](#attributes)
+  - [🛣️ Routing](#️-routing)
+    - [Auto-Generated Routes](#auto-generated-routes)
+    - [Dynamic Routes](#dynamic-routes)
+    - [Client-Side Navigation](#client-side-navigation)
+    - [Accessing Route Parameters](#accessing-route-parameters)
+  - [⚡ Prefetching](#-prefetching)
+    - [Automatic Prefetching](#automatic-prefetching)
+  - [🎨 Styling](#-styling)
+  - [🔧 Framework API](#-framework-api)
+    - [Component Props](#component-props)
+    - [Reactive State](#reactive-state)
+    - [Navigation Utilities](#navigation-utilities)
+  - [📦 Available Scripts](#-available-scripts)
+  - [🏗️ Rendering Flow](#️-rendering-flow)
+    - [SSR (Server-Side Rendering)](#ssr-server-side-rendering)
+    - [CSR (Client-Side Rendering)](#csr-client-side-rendering)
+  - [🗺️ Roadmap](#️-roadmap)
+
+## ✨ Key Features
+
+- 🚀 **Multiple Rendering Strategies**: SSR, CSR, SSG, and ISR support
+- ⚡ **Auto-Generated Routes**: File-based routing with dynamic routes `[param]`
+- 🔄 **Reactive System**: Vue-like reactivity with `reactive()` and `computed()`
+- 🧩 **Component-Based**: Reusable `.html` components (server & client)
+- 🎭 **Streaming & Suspense**: Progressive loading with fallback UI
+- 📐 **Nested Layouts**: Custom layouts per route
+- 🔗 **Smart Prefetching**: Automatic page prefetching on link hover
+- 💾 **Built-in Caching**: Server and client-side caching
+- 🎨 **Tailwind CSS**: Integrated styling solution
+- 📝 **Template Syntax**: Familiar directives (`v-if`, `v-for`, `@click`, etc.)
+- 🌐 **SPA Navigation**: Client-side routing without page reloads
+- 🔌 **Zero Config**: No manual route registration needed
+
+## �📁 Project Structure
 
 ```
-├── pages/                    # Application pages
-│   ├── layout.html          # Main layout (header, footer, etc.)
-│   ├── page.html            # Home page
-│   ├── error/page.html      # Error page
-│   ├── not-found/page.html  # 404 page
-│   ├── meteo-csr/page.html  # CSR example
-│   └── meteo-ssr/page.html  # SSR example
-├── public/                   # Static assets
-│   ├── app/services/        # Client framework core
-│   │   ├── component.js     # Component base class
-│   │   ├── reactive.js      # Reactivity system
-│   │   ├── html.js          # Tagged template literal
-│   │   ├── decorators.js    # Component decorators
-│   │   ├── hydrate.js       # Component hydration
-│   │   └── navigation.js    # Client router
-│   ├── components/          # Client components (c-*)
-│   └── styles.css           # Styles (Tailwind)
-└── server/                   # Node.js server
-    ├── index.js             # Entry point
-    ├── router.js            # Router and SSR rendering
-    ├── _app/routes.js       # Route definitions
-    ├── components/          # Server components (s-*)
-    └── utils/
-        ├── template.js      # Template rendering
-        └── streaming.js     # Suspense and streaming
+├── pages/                       # Application pages
+│   ├── layout.html             # Main layout (header, footer, etc.)
+│   ├── page.html               # Home page
+│   ├── error/page.html         # Error page
+│   ├── not-found/page.html     # 404 page
+│   ├── page-csr/               # CSR example
+│   │   ├── page.html           # CSR main page
+│   │   └── [city]/page.html    # Dynamic CSR route
+│   ├── page-ssr/               # SSR example
+│   │   ├── page.html           # SSR main page
+│   │   └── [city]/page.html    # Dynamic SSR route
+│   ├── static/                 # Static page example
+│   │   ├── layout.html         # Static layout
+│   │   └── page.html           # Static page
+│   └── static-with-data/       # Static with data example
+│       └── page.html           # Static page with data fetching
+├── components/                  # Component definitions (.html files)
+│   ├── counter.html            # Counter component
+│   ├── user-card.html          # User card component
+│   ├── user-card-delayed.html  # Delayed user card (for suspense demo)
+│   ├── user-card-skeleton.html # Skeleton placeholder
+│   ├── weather.html            # Weather component
+│   └── weather/                # Weather sub-components
+│       ├── weather-links.html
+│       ├── weather-params.html
+│       └── weather-state.html
+└── .app/                        # Framework files (do not edit)
+    ├── client/                 # Client-side framework
+    │   ├── services/           # Client framework core
+    │   │   ├── reactive.js     # Reactivity system
+    │   │   ├── html.js         # Template literal helpers
+    │   │   ├── hydrate.js      # Component hydration
+    │   │   ├── cache.js        # Client-side caching
+    │   │   ├── navigation/     # Navigation utilities
+    │   │   │   ├── router.js   # Client router
+    │   │   │   ├── navigate.js # Navigation API
+    │   │   │   ├── prefetch.js # Page prefetching
+    │   │   │   ├── metadata.js # Dynamic metadata
+    │   │   │   └── ...
+    │   │   └── _routes.js      # Auto-generated routes
+    │   ├── _components/        # Auto-generated component scripts
+    │   ├── styles.css          # Compiled Tailwind styles
+    │   └── favicon.ico         # Favicon
+    └── server/                 # Server-side framework
+        ├── index.js            # Entry point
+        ├── root.html           # Root HTML template
+        ├── _cache/             # Server-side cache
+        └── utils/              # Server utilities
+            ├── router.js       # Router and SSR rendering
+            ├── component-processor.js  # Component processing
+            ├── template.js     # Template rendering
+            ├── streaming.js    # Suspense and streaming
+            ├── cache.js        # Server-side caching
+            ├── files.js        # File system utilities
+            └── _routes.js      # Auto-generated routes
 ```
 
 ## 🚀 Quick Start
@@ -45,8 +136,8 @@ pnpm install
 # Start development server
 pnpm dev
 
-# Build for production
-pnpm build
+# Start production server
+pnpm start
 ```
 
 The server will be available at `http://localhost:3000`
@@ -58,11 +149,15 @@ Pages are created in `pages/` with the following structure:
 ```html
 <!-- pages/example/page.html -->
 <script server>
-  // Code that runs on the server
+  // Server-side imports (components)
+  import UserCard from "components/user-card.html";
+
+  // Server-side data fetching
   async function getData() {
     return { message: "Hello from the server" };
   }
 
+  // Page metadata
   const metadata = {
     title: "My Page",
     description: "Page description",
@@ -70,86 +165,335 @@ Pages are created in `pages/` with the following structure:
 </script>
 
 <script client>
-  // Client component imports
-  import "/public/components/Counter.js";
+  // Client-side component imports
+  import Counter from "components/counter.html";
 </script>
 
 <template>
   <h1>{{message}}</h1>
-  <c-counter start="0"></c-counter>
+  <Counter start="0" />
+  <UserCard userId="123" />
 </template>
 ```
 
-**Register the route** in `server/_app/routes.js`:
-
-```js
-export const routes = [
-  { path: "/example", meta: { ssr: true, requiresAuth: false } },
-];
-```
+**Routes are auto-generated** from the `pages/` folder structure. No need to manually register routes!
 
 ## 🧩 Components
 
-### Client Component (CSR)
+Components are defined in `.html` files within the `components/` folder. They can be either client-side or server-side components.
 
-Client components are interactive and reactive. They are defined with the `c-` prefix with `defineComponent`:
-
-```js
-// public/components/counter.js
-import { Component } from "../app/services/component.js";
-import { defineComponent } from "../app/services/decorators.js";
-import { html } from "../app/services/html.js";
-import { reactive } from "../app/services/reactive.js";
-
-export class Counter extends Component {
-  count = reactive(0);
-
-  increment() {
-    this.count.value++;
-  }
-
-  render() {
-    return html`
-      <button @click="${this.increment}" class="btn">
-        Count: ${this.count.value}
-      </button>
-    `;
-  }
-}
-
-defineComponent("counter")(Counter);
-```
-
-**Usage in HTML:**
+### Component Structure
 
 ```html
-<c-counter start="5"></c-counter>
+<!-- components/counter.html -->
+<script client>
+  import { reactive, computed } from ".app/reactive.js";
+
+  // Component props
+  const props = vprops({
+    start: { default: 10 },
+  });
+
+  // Reactive state
+  const counter = reactive(props.start);
+
+  // Methods
+  function increment() {
+    counter.value++;
+  }
+
+  function decrement() {
+    counter.value--;
+  }
+
+  // Computed values
+  const stars = computed(() => Array.from({ length: counter.value }, () => "⭐"));
+</script>
+
+<template>
+  <div class="flex items-center gap-4">
+    <button @click="decrement" :disabled="counter <= 0">
+      Sub
+    </button>
+    <span>{{counter}}</span>
+    <button @click="increment">
+      Add
+    </button>
+    <div>{{stars.join('')}}</div>
+  </div>
+</template>
 ```
 
-### Server Component (SSR)
+### Server Components
 
-Server components are rendered on the backend. They are defined with the `s-` prefix:
+Server components are rendered on the backend and support async data fetching:
 
+```html
+<!-- components/user-card.html -->
+<script server>
+  const props = vprops({
+    userId: { required: true },
+  });
+
+  async function getData() {
+    const user = await fetch(`https://api.example.com/users/${props.userId}`)
+      .then(res => res.json());
+    return { user };
+  }
+</script>
+
+<template>
+  <div class="user-card">
+    <h3>{{user.name}}</h3>
+    <p>{{user.email}}</p>
+  </div>
+</template>
+```
+
+### Using Components
+
+Import and use components in your pages:
+
+```html
+<!-- In pages/page.html -->
+<script client>
+  import Counter from "components/counter.html";
+</script>
+
+<script server>
+  import UserCard from "components/user-card.html";
+</script>
+
+<template>
+  <Counter start="5" />
+  <UserCard userId="123" />
+</template>
+```
+
+## 🎭 Rendering Strategies
+
+The framework supports multiple rendering strategies to optimize performance and user experience based on your needs.
+
+### SSR - Server-Side Rendering
+
+**When to use**: Dynamic content that changes frequently, SEO-critical pages, personalized content.
+
+Pages are rendered on the server for each request. HTML is generated with fresh data and sent to the client.
+
+```html
+<!-- pages/page-ssr/page.html -->
+<script server>
+  async function getData() {
+    // Fresh data on every request
+    const data = await fetch('https://api.example.com/data').then(r => r.json());
+    return { data };
+  }
+
+  const metadata = {
+    title: "SSR Page",
+    description: "Server-rendered on every request"
+  };
+</script>
+
+<template>
+  <h1>{{data.title}}</h1>
+  <p>Generated at: {{new Date().toISOString()}}</p>
+</template>
+```
+
+**Characteristics:**
+- ✅ Fresh data on every request
+- ✅ Best for SEO (fully rendered HTML)
+- ✅ Fast initial page load
+- ⚠️ Server load on every request
+
+### CSR - Client-Side Rendering
+
+**When to use**: Highly interactive dashboards, authenticated areas, apps with frequent updates.
+
+Minimal HTML is sent from the server. All rendering happens in the browser using JavaScript.
+
+```html
+<!-- pages/page-csr/page.html -->
+<script client>
+  import { reactive } from ".app/reactive.js";
+  
+  const data = reactive(null);
+  
+  // Fetch data on client
+  async function loadData() {
+    const response = await fetch('https://api.example.com/data');
+    data.value = await response.json();
+  }
+  
+  loadData();
+</script>
+
+<template>
+  <div v-if="data">
+    <h1>{{data.title}}</h1>
+  </div>
+  <div v-else>
+    Loading...
+  </div>
+</template>
+```
+
+**Characteristics:**
+- ✅ Highly interactive
+- ✅ Reduced server load
+- ✅ Instant navigation after first load
+- ⚠️ Slower initial render
+- ⚠️ Less SEO-friendly
+
+### SSG - Static Site Generation
+
+**When to use**: Content that rarely changes (docs, blogs, marketing pages).
+
+Pages are pre-rendered at build time and served as static HTML. No server processing on requests.
+
+```html
+<!-- pages/static-with-data/page.html -->
+<script server>
+  async function getData() {
+    // Fetched once at build time
+    const data = await fetch('https://api.example.com/content').then(r => r.json());
+    return { data };
+  }
+
+  const metadata = {
+    title: "Static Page",
+    description: "Pre-rendered at build time",
+    revalidate: 'never' // Never regenerate
+  };
+</script>
+
+<template>
+  <h1>{{data.title}}</h1>
+  <p>Built at: {{new Date().toISOString()}}</p>
+</template>
+```
+
+**Characteristics:**
+- ✅ Fastest possible delivery (static files)
+- ✅ Lowest server cost
+- ✅ Perfect for SEO
+- ✅ Can be served from CDN
+- ⚠️ Content only updates on rebuild
+
+### ISR - Incremental Static Regeneration
+
+**When to use**: Content that changes occasionally (product pages, articles with comments).
+
+Pages are statically generated but automatically regenerate after a specified time period.
+
+```html
+<!-- pages/page-ssr/[city]/page.html -->
+<script server>
+  import { useRouteParams } from ".app/navigation/use-route-params.js";
+  
+  async function getData() {
+    const { city } = useRouteParams();
+    const weather = await fetch(`https://api.weather.com/${city}`).then(r => r.json());
+    return { city, weather };
+  }
+
+  const metadata = {
+    title: "Weather",
+    description: "Weather with ISR",
+    revalidate: 10 // Regenerate every 10 seconds
+  };
+</script>
+
+<template>
+  <h1>Weather in {{city}}</h1>
+  <p>Temperature: {{weather.temp}}°C</p>
+  <p class="text-sm text-gray-500">Updates every 10 seconds</p>
+</template>
+```
+
+**Characteristics:**
+- ✅ Static performance with fresh content
+- ✅ Automatic background regeneration
+- ✅ Best of both worlds (speed + freshness)
+- ✅ Reduces API calls
+- ⚠️ Slightly stale data possible (within revalidation window)
+
+**Revalidation options:**
 ```js
-// server/components/user-card.js
-export default async function UserCard({ userId }) {
-  const user = await fetch(`https://api.example.com/users/${userId}`).then(
-    (res) => res.json()
-  );
+const metadata = {
+  revalidate: 'never',  // Pure static (SSG)
+  revalidate: 10,       // Regenerate every 10 seconds (ISR)
+  // No revalidate      // Server-side rendering on every request (SSR)
+};
+```
 
-  return `
-    <div class="user-card">
-      <h3>${user.name}</h3>
-      <p>${user.email}</p>
+## 📐 Layouts
+
+The framework supports nested layouts for consistent page structure.
+
+### Root Layout
+
+The main layout is defined in `pages/layout.html` and wraps all pages:
+
+```html
+<!-- pages/layout.html -->
+<script client>
+  const props = vprops({
+    children: { default: null },
+  });
+</script>
+
+<template>
+  <div>
+    <header class="bg-white shadow">
+      <nav>
+        <a href="/">Home</a>
+        <a href="/page-ssr">SSR</a>
+        <a href="/page-csr">CSR</a>
+      </nav>
+    </header>
+    
+    <main>
+      {{children}} <!-- Page content injected here -->
+    </main>
+    
+    <footer class="bg-gray-800 text-white">
+      <p>&copy; 2026 My App</p>
+    </footer>
+  </div>
+</template>
+```
+
+### Custom Nested Layouts
+
+You can create custom layouts for specific routes:
+
+```html
+<!-- pages/static/layout.html -->
+<script client>
+  const props = vprops({
+    children: { default: null },
+  });
+</script>
+
+<template>
+  <div class="static-layout">
+    <aside class="sidebar">
+      <!-- Sidebar navigation -->
+    </aside>
+    <div class="content">
+      {{children}} <!-- Page content -->
     </div>
-  `;
-}
+  </div>
+</template>
 ```
 
-**Usage in pages:**
-
-```html
-<s-user-card userId="123"></s-user-card>
+**Layout Hierarchy:**
+```
+pages/layout.html (root layout)
+  └─> pages/static/layout.html (custom layout for /static/*)
+       └─> pages/static/page.html (page content)
 ```
 
 ## ⏳ Suspense (Streaming)
@@ -157,9 +501,16 @@ export default async function UserCard({ userId }) {
 Allows showing a fallback while content loads asynchronously:
 
 ```html
-<suspense fallback="<s-skeleton></s-skeleton>">
-  <s-user-card-delayed userId="123"></s-user-card-delayed>
-</suspense>
+<script server>
+  import UserCardDelayed from "components/user-card-delayed.html";
+  import UserCardSkeleton from "components/user-card-skeleton.html";
+</script>
+
+<template>
+  <Suspense :fallback="<UserCardSkeleton />">
+    <UserCardDelayed userId="123" />
+  </Suspense>
+</template>
 ```
 
 **Benefits:**
@@ -167,84 +518,208 @@ Allows showing a fallback while content loads asynchronously:
 - The rest of the page is shown immediately
 - Slow components load via streaming
 - Improves perceived performance
+- Better user experience with progressive loading
 
 ## 🔄 Reactive System
 
 The reactive system allows creating variables that automatically update the UI:
 
 ```js
-import { reactive, effect } from "../app/services/reactive.js";
+import { reactive, computed } from ".app/reactive.js";
 
 // Create reactive state
-const state = reactive({ count: 0, name: "Alice" });
+const counter = reactive(0);
+const name = reactive("Alice");
 
-// Execute code when state changes
-effect(() => {
-  console.log(`Count: ${state.count}`);
-});
+// Computed values (auto-update when dependencies change)
+const doubleCount = computed(() => counter.value * 2);
 
-state.count++; // Triggers the effect automatically
+// Update reactive values
+counter.value++; // UI automatically updates
 ```
 
 **In components:**
 
-```js
-class MyComponent extends Component {
-  count = reactive(0);
+```html
+<script client>
+  import { reactive, computed } from ".app/reactive.js";
 
-  render() {
-    return html`<p>Count: ${this.count.value}</p>`;
+  const count = reactive(0);
+  const doubled = computed(() => count.value * 2);
+
+  function increment() {
+    count.value++;
   }
-}
+</script>
+
+<template>
+  <p>Count: {{count}}</p>
+  <p>Doubled: {{doubled}}</p>
+  <button @click="increment">Increment</button>
+</template>
 ```
 
-## 📝 HTML Templates
+## 📝 Template Syntax
 
-The `html` helper allows creating templates with JSX-like syntax:
+Components use a template syntax that supports interpolation, directives, and event handlers.
 
-```js
-import { html } from "../app/services/html.js";
+> **Note:** The template syntax is inspired by Vue.js for educational purposes. This framework was created as a learning exercise to understand how modern frameworks work internally while practicing Vue.js concepts.
 
-const name = "Carlos";
-const items = ["Item 1", "Item 2", "Item 3"];
+### Interpolation
 
-const template = html`
-  <div>
-    <h1>Hello, ${name}</h1>
+```html
+<template>
+  <h1>Hello, {{name}}</h1>
+  <p>Count: {{counter}}</p>
+</template>
+```
 
-    <!-- Event listeners -->
-    <button @click="${() => console.log("Click!")}">Click me</button>
+### Conditionals
 
-    <!-- Render arrays -->
-    <ul>
-      ${items.map((item) => html`<li>${item}</li>`)}
-    </ul>
+```html
+<template>
+  <div v-if="isVisible">
+    This is visible
   </div>
-`;
+  <div v-else>
+    This is hidden
+  </div>
+</template>
+```
+
+### Lists
+
+```html
+<template>
+  <ul>
+    <li v-for="item in items">
+      {{item}}
+    </li>
+  </ul>
+</template>
+```
+
+### Event Handlers
+
+```html
+<template>
+  <button @click="increment">Click me</button>
+  <input @input="handleInput" />
+</template>
+```
+
+### Attributes
+
+```html
+<template>
+  <button :disabled="counter <= 0">Decrement</button>
+  <div :class="isActive ? 'active' : ''">Content</div>
+</template>
 ```
 
 ## 🛣️ Routing
 
-### Server-Side Routing
+### Auto-Generated Routes
 
-Define routes in `server/_app/routes.js`:
+Routes are automatically generated from the `pages/` folder structure:
 
-```js
-export const routes = [
-  { path: "/", meta: { ssr: true } },
-  { path: "/about", meta: { ssr: true } },
-  { path: "/meteo-csr", meta: { ssr: false } }, // Client-only
-];
+```
+pages/
+  ├── page.html              → /
+  ├── page-ssr/page.html     → /page-ssr
+  ├── page-csr/page.html     → /page-csr
+  └── page-ssr/[city]/page.html → /page-ssr/:city (dynamic)
+```
+
+### Dynamic Routes
+
+Create dynamic routes using `[param]` syntax:
+
+```html
+<!-- pages/page-ssr/[city]/page.html -->
+<script server>
+  import { useRouteParams } from ".app/navigation/use-route-params.js";
+
+  async function getData() {
+    const { city } = useRouteParams();
+    // Fetch data based on city parameter
+    return { city };
+  }
+</script>
+
+<template>
+  <h1>Weather for {{city}}</h1>
+</template>
 ```
 
 ### Client-Side Navigation
 
 ```js
-import { navigate } from "/public/app/services/navigation.js";
+import { navigate } from ".app/navigation.js";
 
 // Navigate without page reload
-navigate("/about");
+navigate("/page-ssr");
 ```
+
+### Accessing Route Parameters
+
+```js
+import { useRouteParams } from ".app/navigation/use-route-params.js";
+import { useQueryParams } from ".app/navigation/use-query-params.js";
+
+// Get route parameters (/page/:id)
+const { id } = useRouteParams();
+
+// Get query parameters (?search=query)
+const { search } = useQueryParams();
+```
+
+## ⚡ Prefetching
+
+The framework automatically prefetches pages to improve navigation performance.
+
+### Automatic Prefetching
+
+Add the `data-prefetch` attribute to any link to prefetch the page when it enters the viewport:
+
+```html
+<template>
+  <nav>
+    <a href="/page-ssr" data-prefetch>SSR Page (Prefetched)</a>
+    <a href="/page-csr" data-prefetch>CSR Page (Prefetched)</a>
+    <a href="/static">Static Page (No prefetch)</a>
+  </nav>
+</template>
+```
+
+**How it works:**
+1. Links with `data-prefetch` are observed using IntersectionObserver
+2. When a link becomes visible, the page component is loaded in the background
+3. Navigation to prefetched pages is instant (no loading delay)
+4. Components are cached for subsequent navigations
+
+**Benefits:**
+- ⚡ Near-instant page transitions
+- 🎯 Smart loading (only when visible)
+- 💾 Automatic caching
+- 🔄 Works with SPA navigation
+
+**Example in layout:**
+```html
+<!-- pages/layout.html -->
+<template>
+  <header>
+    <nav>
+      <a href="/" data-prefetch>Home</a>
+      <a href="/page-ssr" data-prefetch>SSR</a>
+      <a href="/page-csr" data-prefetch>CSR</a>
+      <a href="/static" data-prefetch>Static</a>
+    </nav>
+  </header>
+</template>
+```
+
+**Performance tip:** Use prefetching for frequently accessed pages or important navigation paths.
 
 ## 🎨 Styling
 
@@ -258,41 +733,55 @@ The project uses **Tailwind CSS**. Styles are compiled automatically:
 
 ## 🔧 Framework API
 
-### Component
+### Component Props
 
 ```js
-class MyComponent extends Component {
-  // Lifecycle hooks
-  onMount() {
-    console.log("Component mounted");
-  }
-
-  onDestroy() {
-    console.log("Component destroyed");
-  }
-
-  // Required render method
-  render() {
-    return html`<div>Content</div>`;
-  }
-}
+const props = vprops({
+  userId: { required: true },
+  count: { default: 0 },
+  name: { default: "Guest" },
+});
 ```
 
-### Decorators
+### Reactive State
 
 ```js
-import { defineComponent } from "../app/services/decorators.js";
+import { reactive, computed } from ".app/reactive.js";
 
-// Register component with c- prefix
-defineComponent("my-component")(MyComponent);
+// Reactive primitive
+const count = reactive(0);
+count.value++;
+
+// Reactive object
+const state = reactive({ name: "Alice", age: 25 });
+state.name = "Bob";
+
+// Computed values
+const doubled = computed(() => count.value * 2);
+```
+
+### Navigation Utilities
+
+```js
+import { navigate } from ".app/navigation.js";
+import { useRouteParams } from ".app/navigation/use-route-params.js";
+import { useQueryParams } from ".app/navigation/use-query-params.js";
+
+// Navigate to a route
+navigate("/page-ssr/madrid");
+
+// Access route params
+const { city } = useRouteParams();
+
+// Access query params
+const { search } = useQueryParams();
 ```
 
 ## 📦 Available Scripts
 
 ```bash
-pnpm dev          # Development server
-pnpm build        # Build for production
-pnpm preview      # Preview build
+pnpm dev          # Development server (auto-reloads on changes)
+pnpm start        # Production server
 pnpm format       # Format code with Biome
 ```
 
@@ -313,53 +802,261 @@ sequenceDiagram
         participant ComponentProcessor
         participant Streaming
         participant Template
+        participant Cache
 
-        Client ->> Server: request page /blog
-        Note over Client,Server: Request SSR
+        Client ->> Server: Request page (e.g., /page-ssr)
         Server ->> Router: handlePageRequest(req, res, route)
-        Router ->> ComponentProcessor: renderHtmlFile(filePath, data)
-        ComponentProcessor ->> ComponentProcessor: processHtmlFile(filePath)
-        Note over ComponentProcessor: getData, metatada, <br />template, clientCode, <br />sComponentsMap, cComponentsMap
-        ComponentProcessor ->> ComponentProcessor: getData(data)
-        Note over ComponentProcessor: SSR fetch data
-        ComponentProcessor ->> Template: compileTemplateToHTML(template, data)
-        Template ->> Template: processNodes
-        Note over Template: Html dom tree (htmlparser2)
-        Template ->> ComponentProcessor: html
-        ComponentProcessor ->> Router: html, metada, clientCode, scomponentsMap, ccomponentsMap
-        Router ->> Streaming: renderComponents(html, sComponentsMap, cComponentsMap)
-        Streaming ->> Streaming: renderServerComponents(html, sComponentsMap)
-        Note over Streaming: html and suspenseComponents
-        Streaming ->> Streaming: renderClientComponents(html, cComponentsMap)
-        Note over Streaming: html and clientComponentsScripts <br/> html replaced ccomponents by templates <br/> to be hydrated on client
-        Streaming ->> Router: html, suspenseComponents, clientComponentsScripts
-        Router --> Router: generateClientScriptTags(clientCode, componentScripts, cComponents)
-        Note over Streaming: scripts that need the page
-        Router ->> Router: compileTemplateToHtml(layoutTemplate, { clientScripts, metatada, children: html })
-        Note over Streaming: html with root layout
-        alt no suspense components
-            Router ->> Client: sendResponse(res, statusCode, html)
-        else suspense components
-            Router ->> Client: res.write(no_closed_html)
-            loop suspense components
-              Router ->> Streaming: renderSuspenseComponent(suspenseComponent, sComponentsMap)
-              Streaming ->> Streaming: processServerComponents(html, serverComponents)
-              Note over Streaming: scomponent html
-              Streaming ->> Router: html
-              Router ->> Streaming: generateReplacementContent(suspenseComponentId, html)
-              Streaming ->> Router: scomponent html in template with id to be replaced on client
-              Router ->> Client: res.write(template_suspense_component_html)
+        Router ->> Router: Check if ISR enabled (route.meta.revalidate)
+        
+        alt ISR enabled and cache valid
+            Router ->> Cache: getCachedComponentHtml(url, revalidateSeconds)
+            Cache -->> Router: Cached HTML (if not stale)
+            Router ->> Client: Send cached HTML
+        else No cache or stale
+            Router ->> ComponentProcessor: renderPageWithLayout(pagePath, context)
+            ComponentProcessor ->> ComponentProcessor: renderPage(pagePath, context)
+            ComponentProcessor ->> ComponentProcessor: processHtmlFile(filePath)
+            Note over ComponentProcessor: Extract getData, metadata,<br/>template, clientCode,<br/>serverComponents, clientComponents
+            ComponentProcessor ->> ComponentProcessor: getData(context)
+            Note over ComponentProcessor: Fetch server-side data
+            ComponentProcessor ->> Template: compileTemplateToHTML(template, data)
+            Template ->> Template: parseHTMLToNodes & processNode
+            Note over Template: Process Vue-like syntax:<br/>{{interpolation}}, v-if, v-for, etc.
+            Template -->> ComponentProcessor: Compiled HTML
+            ComponentProcessor ->> Streaming: renderComponents(html, serverComponents, clientComponents)
+            Streaming ->> Streaming: renderServerComponents(html, serverComponents)
+            Note over Streaming: Process <Suspense> boundaries<br/>Extract suspense components<br/>Render fallback content
+            Streaming ->> Streaming: renderClientComponents(html, clientComponents)
+            Note over Streaming: Replace client components with<br/>hydration templates<br/>Generate component scripts
+            Streaming -->> ComponentProcessor: { html, suspenseComponents, clientComponentsScripts }
+            ComponentProcessor ->> ComponentProcessor: generateClientScriptTags(...)
+            Note over ComponentProcessor: Generate <script> tags for<br/>client code and components
+            ComponentProcessor ->> ComponentProcessor: renderLayouts(pagePath, html, metadata)
+            Note over ComponentProcessor: Wrap page in nested layouts<br/>(innermost to outermost)<br/>Then wrap in root.html
+            ComponentProcessor -->> Router: { html, metadata, suspenseComponents, serverComponents }
+            
+            alt No suspense components
+                Router ->> Client: sendResponse(res, statusCode, html)
+                Router ->> Cache: saveCachedComponentHtml (if ISR)
+            else Has suspense components (streaming)
+                Router ->> Client: sendStartStreamChunkResponse(res, html_before_closing)
+                Note over Router,Client: Stream initial HTML (before </body>)
+                loop For each suspense component
+                    Router ->> Streaming: renderSuspenseComponent(suspense, serverComponents)
+                    Streaming ->> Streaming: processServerComponents(content, serverComponents)
+                    Note over Streaming: Render server components<br/>inside suspense boundary
+                    Streaming -->> Router: Rendered HTML content
+                    Router ->> Router: generateReplacementContent(suspenseId, html)
+                    Note over Router: Generate <template> + hydration script
+                    Router ->> Client: sendStreamChunkResponse(res, replacement_html)
+                end
+                Router ->> Client: endStreamResponse(res) - Send </body></html>
+                Router ->> Cache: saveCachedComponentHtml (if ISR and no errors)
             end
-            Router ->> Client: res.end(closed_html)
         end
 ```
 
 ### CSR (Client-Side Rendering)
 
-1. Request → Server sends minimal HTML
-2. Browser executes `<script client>`
-3. Client components mount dynamically
-4. Full interactivity on the client
+```mermaid
+---
+config:
+  theme: mc
+---
+sequenceDiagram
+        autonumber
+        participant User
+        participant Browser
+        participant Navigation
+        participant Router
+        participant Cache
+        participant LayoutRenderer
+        participant Component
+        participant Hydrator
+
+        User ->> Browser: Click link or initial page load
+        Browser ->> Navigation: navigate(path)
+        Navigation ->> Navigation: abortPrevious()
+        Note over Navigation: Cancel any in-progress navigation
+        Navigation ->> Router: findRouteWithParams(path)
+        Router -->> Navigation: { route, params }
+        Navigation ->> Navigation: updateRouteParams(params)
+        Navigation ->> Navigation: history.pushState({}, "", path)
+        
+        alt Route is SSR (meta.ssr = true)
+            Navigation ->> Browser: fetch(path, { signal })
+            Browser -->> Navigation: Response stream
+            Navigation ->> Navigation: renderSSRPage(path, signal)
+            Note over Navigation: Progressive rendering:<br/>- Parse <main><br/>- Parse <template><br/>- Execute <script><br/>- Update metadata
+            Navigation ->> Hydrator: hydrateComponents()
+            Note over Hydrator: Hydrate streamed components
+        else Route is CSR (meta.ssr = false)
+            Navigation ->> Cache: loadRouteComponent(route.path, route.component)
+            
+            alt Component cached
+                Cache -->> Navigation: Cached module
+            else Component not cached
+                Cache ->> Component: Dynamic import(route.component)
+                Component -->> Cache: Module with hydrateClientComponent
+                Cache ->> Cache: routeCache.set(path, module)
+                Cache -->> Navigation: Fresh module
+            end
+            
+            Navigation ->> Component: module.hydrateClientComponent(marker)
+            Component -->> Navigation: pageNode (DOM node)
+            
+            Navigation ->> LayoutRenderer: generate({ routeLayouts, pageNode, metadata })
+            
+            alt Layouts already rendered
+                LayoutRenderer ->> LayoutRenderer: getNearestRendered(routeLayouts)
+                Note over LayoutRenderer: Find nearest cached layout
+                LayoutRenderer ->> LayoutRenderer: getLayoutsToRender()
+                Note over LayoutRenderer: Only render new/changed layouts
+            else No cached layouts
+                LayoutRenderer ->> LayoutRenderer: loadLayoutModules(layouts)
+                Note over LayoutRenderer: Import all layout modules
+            end
+            
+            loop For each layout (innermost to outermost)
+                LayoutRenderer ->> Component: layout.hydrateClientComponent(marker, { children })
+                Component -->> LayoutRenderer: layoutNode wrapping children
+                LayoutRenderer ->> LayoutRenderer: renderedLayouts.set(name, { node, children })
+            end
+            
+            LayoutRenderer -->> Navigation: { layoutId, node, metadata }
+            
+            alt Layout already exists in DOM
+                Navigation ->> LayoutRenderer: patch(layoutId, node)
+                LayoutRenderer ->> Browser: Replace children in existing layout
+            else New layout
+                Navigation ->> Browser: root.appendChild(node)
+            end
+            
+            Navigation ->> Browser: addMetadata(metadata)
+            Note over Browser: Update <title> and meta tags
+            Navigation ->> Hydrator: hydrateComponents()
+            
+            loop For each component marker
+                Hydrator ->> Hydrator: Check data-hydrated attribute
+                alt Not hydrated
+                    Hydrator ->> Component: import(`/.app/client/_components/${name}.js`)
+                    Component -->> Hydrator: Module
+                    Hydrator ->> Component: module.hydrateClientComponent(marker, props)
+                    Component -->> Hydrator: Hydrated component
+                    Hydrator ->> Hydrator: marker.dataset.hydrated = "true"
+                end
+            end
+        end
+        
+        Navigation ->> Navigation: currentNavigationController = null
+        Navigation -->> User: Page rendered and interactive
+```
+
+### ISR (Incremental Static Regeneration)
+
+```mermaid
+---
+config:
+  theme: mc
+---
+sequenceDiagram
+        autonumber
+        participant Client
+        participant Server
+        participant Router
+        participant Cache
+        participant FileSystem
+        participant ComponentProcessor
+
+        Client ->> Server: Request page (e.g., /page-ssr/madrid)
+        Server ->> Router: handlePageRequest(req, res, route)
+        Router ->> Router: getRevalidateSeconds(route.meta.revalidate)
+        
+        alt revalidate = 'never' or false
+            Note over Router: ISR disabled (Pure SSG)<br/>revalidateSeconds = -1
+        else revalidate = number
+            Note over Router: ISR enabled<br/>revalidateSeconds = number
+        else revalidate = true
+            Note over Router: ISR enabled<br/>revalidateSeconds = 60 (default)
+        else revalidate = 0 or undefined
+            Note over Router: No caching (SSR)<br/>revalidateSeconds = 0
+        end
+        
+        alt ISR enabled (revalidateSeconds !== 0)
+            Router ->> Cache: getCachedComponentHtml(url, revalidateSeconds)
+            Cache ->> FileSystem: getComponentHtmlDisk(componentPath)
+            
+            alt Cache exists on disk
+                FileSystem -->> Cache: { html, meta: { generatedAt, isStale } }
+                Cache ->> Cache: Calculate if stale by time
+                Note over Cache: staleByTime = (now - generatedAt) > revalidateSeconds * 1000
+                Cache ->> Cache: isStale = meta.isStale || staleByTime
+                Cache -->> Router: { html, isStale }
+                
+                alt Cache valid (!isStale)
+                    Router ->> Client: sendResponse(res, 200, cachedHtml)
+                    Note over Router,Client: Instant response from cache<br/>No regeneration needed
+                else Cache stale (isStale = true)
+                    Note over Router: Continue to regeneration<br/>Serve stale content while regenerating
+                end
+            else No cache exists
+                FileSystem -->> Cache: { html: null }
+                Cache -->> Router: { html: null }
+                Note over Router: First request - generate and cache
+            end
+        end
+        
+        alt Need to regenerate (no cache, stale, or ISR disabled)
+            Router ->> ComponentProcessor: renderPageWithLayout(pagePath, context)
+            ComponentProcessor ->> ComponentProcessor: Process page, fetch data, render
+            ComponentProcessor -->> Router: { html, suspenseComponents, serverComponents }
+            
+            alt No suspense components
+                Router ->> Client: sendResponse(res, 200, html)
+                
+                alt ISR enabled
+                    Router ->> Cache: saveCachedComponentHtml(url, html)
+                    Cache ->> FileSystem: saveComponentHtmlDisk(componentPath, html)
+                    Note over FileSystem: Save HTML + metadata:<br/>{ generatedAt: Date.now(), isStale: false }
+                    FileSystem -->> Cache: Saved successfully
+                    Cache -->> Router: Cache updated
+                end
+            else Has suspense components (streaming)
+                Router ->> Client: sendStartStreamChunkResponse(res, html_before_closing)
+                Router ->> Router: Track htmlChunks[], abortedStream, errorStream
+                
+                loop For each suspense component
+                    Router ->> ComponentProcessor: renderSuspenseComponent(suspense, serverComponents)
+                    ComponentProcessor -->> Router: Rendered HTML content
+                    Router ->> Router: generateReplacementContent(suspenseId, html)
+                    Router ->> Client: sendStreamChunkResponse(res, replacement_html)
+                    Router ->> Router: Append to htmlChunks[]
+                end
+                
+                Router ->> Client: endStreamResponse(res) - Send </body></html>
+                
+                alt ISR enabled and no errors
+                    Router ->> Cache: saveCachedComponentHtml(url, htmlChunks.join(''))
+                    Cache ->> FileSystem: saveComponentHtmlDisk(componentPath, fullHtml)
+                    Note over FileSystem: Save complete streamed HTML<br/>with metadata
+                    FileSystem -->> Cache: Saved successfully
+                    Cache -->> Router: Cache updated for next request
+                end
+            end
+        end
+        
+        Note over Client,FileSystem: Next request within revalidation window<br/>will serve cached HTML instantly
+```
+
+**ISR Flow Summary:**
+
+1. **Cache Check**: Verifies if cached HTML exists and if it's still valid
+2. **Stale Detection**: Compares current time vs. generation time + revalidation seconds
+3. **Instant Serve**: If cache is valid, serves immediately without regeneration
+4. **Regeneration**: If cache is stale or missing, regenerates the page
+5. **Background Save**: After regeneration, saves to cache for future requests
+6. **Streaming Support**: Handles suspense components and saves complete HTML
+7. **Error Handling**: Prevents caching if errors occur during streaming
 
 ## 🗺️ Roadmap
 
