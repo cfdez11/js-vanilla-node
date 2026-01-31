@@ -1,11 +1,4 @@
 {
   "buildCommand": "pnpm run build",
-  "installCommand": "pnpm install",
-  "outputDirectory": ".app",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/server/index.js"
-    }
-  ]
+  "installCommand": "pnpm install"
 }
