@@ -7,16 +7,24 @@ import { CLIENT_DIR } from "./utils/files.js";
 // En desarrollo, los generamos en cada inicio para hot-reload
 const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL;
 
+let serverRoutes;
+
 if (!isProduction) {
-  const { initializeDirectories, generateComponentsAndFillCache } = await import("./utils/component-processor.js");
+  const { initializeDirectories } = await import("./utils/files.js");
+  const { generateComponentsAndFillCache } = await import("./utils/component-processor.js");
+  
   await initializeDirectories();
   await generateComponentsAndFillCache();
   console.log("Components generated.");
+  
+  const { serverRoutes: generatedRoutes } = await generateRoutes();
+  serverRoutes = generatedRoutes;
+  console.log("Routes generated.");
+} else {
+  const { routes } = await import("./utils/_routes.js");
+  serverRoutes = routes;
+  console.log("Routes loaded from cache.");
 }
-
-// Cargar las rutas (ya generadas en producción, generadas ahora en desarrollo)
-const { serverRoutes } = await generateRoutes();
-console.log("Routes loaded.");
 
 const app = express();
 
@@ -61,5 +69,4 @@ if (!isProduction) {
   });
 }
 
-// Export para Vercel
 export default app;
