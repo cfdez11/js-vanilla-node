@@ -10,7 +10,8 @@
     "dev:css": "npx @tailwindcss/cli -i ./.app/client/input.css -o ./.app/client/styles.css --watch",
     "dev:server": "node --watch .app/server/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "npx @tailwindcss/cli -i ./.app/client/input.css -o ./.app/client/styles.css --minify"
+    "prebuild": "node .app/server/prebuild.js",
+    "build": "npm run prebuild && npx @tailwindcss/cli -i ./.app/client/input.css -o ./.app/client/styles.css --minify"
   },
   "keywords": [],
   "author": "",

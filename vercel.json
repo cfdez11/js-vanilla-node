@@ -1,25 +1,11 @@
 {
-  "version": 2,
   "buildCommand": "pnpm run build",
-  "outputDirectory": ".",
-  "builds": [
+  "installCommand": "pnpm install",
+  "outputDirectory": ".app",
+  "rewrites": [
     {
-      "src": ".app/server/index.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": ".app/client/**",
-      "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/.app/client/(.*)",
-      "dest": "/.app/client/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": ".app/server/index.js"
+      "source": "/(.*)",
+      "destination": "/server/index.js"
     }
   ]
 }

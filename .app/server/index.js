@@ -1,20 +1,22 @@
 import express from "express";
-import {
-  generateComponentsAndFillCache,
-  generateRoutes,
-} from "./utils/component-processor.js";
+import { generateRoutes } from "./utils/component-processor.js";
 import { handlePageRequest, revalidatePath } from "./utils/router.js";
-import { initializeDirectories, CLIENT_DIR } from "./utils/files.js";
+import { CLIENT_DIR } from "./utils/files.js";
 
-await initializeDirectories();
+// En producción (Vercel), los componentes y rutas ya están pre-generados
+// En desarrollo, los generamos en cada inicio para hot-reload
+const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL;
 
-// Pre-generate all client and server components to have their import statements ready
-await generateComponentsAndFillCache();
-console.log("Components generated.");
+if (!isProduction) {
+  const { initializeDirectories, generateComponentsAndFillCache } = await import("./utils/component-processor.js");
+  await initializeDirectories();
+  await generateComponentsAndFillCache();
+  console.log("Components generated.");
+}
 
-// generate routes automatically
+// Cargar las rutas (ya generadas en producción, generadas ahora en desarrollo)
 const { serverRoutes } = await generateRoutes();
-console.log("Routes generated.");
+console.log("Routes loaded.");
 
 const app = express();
 
@@ -52,6 +54,12 @@ app.use(async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+
+if (!isProduction) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+// Export para Vercel
+export default app;
