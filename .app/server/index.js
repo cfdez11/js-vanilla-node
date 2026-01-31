@@ -1,9 +1,9 @@
 import express from "express";
-import { handlePageRequest, revalidatePath } from "./utils/router.js";
 import {
   generateComponentsAndFillCache,
   generateRoutes,
 } from "./utils/component-processor.js";
+import { handlePageRequest, revalidatePath } from "./utils/router.js";
 import { initializeDirectories, CLIENT_DIR } from "./utils/files.js";
 
 await initializeDirectories();

@@ -114,7 +114,7 @@
     return {
       title: `Weather in ${cityDisplayName} ${props.current?.temperature || '-'}°C - Server Side Rendering`,
       description: `Current weather and forecast for ${cityDisplayName}. Data fetched on the server before rendering.`,
-      revalidate: 'never'
+      revalidate: 10
     };
   };
 </script>

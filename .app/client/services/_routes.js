@@ -66,83 +66,12 @@ import { loadRouteComponent } from './cache.js';
       },
     },
 {
-        path: "/page-ssr/madrid",
-        component: async () => {
-          const mod = await loadRouteComponent("/page-ssr/madrid", () => import("../_components/_page_ssr_madrid_b406ec35.js"));
-
-          return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
-        },
-        layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
-        meta: {
-          ssr: false,
-          requiresAuth: false,
-        },
+      path: "/page-ssr/:city",
+      meta: {
+        ssr: true,
+        requiresAuth: false,
       },
-{
-        path: "/page-ssr/barcelona",
-        component: async () => {
-          const mod = await loadRouteComponent("/page-ssr/barcelona", () => import("../_components/_page_ssr_barcelona_b3ef923b.js"));
-
-          return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
-        },
-        layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
-        meta: {
-          ssr: false,
-          requiresAuth: false,
-        },
-      },
-{
-        path: "/page-ssr/londres",
-        component: async () => {
-          const mod = await loadRouteComponent("/page-ssr/londres", () => import("../_components/_page_ssr_londres_05307de2.js"));
-
-          return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
-        },
-        layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
-        meta: {
-          ssr: false,
-          requiresAuth: false,
-        },
-      },
-{
-        path: "/page-ssr/nuevayork",
-        component: async () => {
-          const mod = await loadRouteComponent("/page-ssr/nuevayork", () => import("../_components/_page_ssr_nuevayork_e2af5ed8.js"));
-
-          return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
-        },
-        layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
-        meta: {
-          ssr: false,
-          requiresAuth: false,
-        },
-      },
-{
-        path: "/page-ssr/paris",
-        component: async () => {
-          const mod = await loadRouteComponent("/page-ssr/paris", () => import("../_components/_page_ssr_paris_71630b6e.js"));
-
-          return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
-        },
-        layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
-        meta: {
-          ssr: false,
-          requiresAuth: false,
-        },
-      },
-{
-        path: "/page-ssr/tokio",
-        component: async () => {
-          const mod = await loadRouteComponent("/page-ssr/tokio", () => import("../_components/_page_ssr_tokio_c94d21bc.js"));
-
-          return { hydrateClientComponent: mod.hydrateClientComponent, metadata: mod.metadata };
-        },
-        layouts: [{"name":"_layout_2c9170dc","importPath":"../_components/_layout_2c9170dc.js"}],
-        meta: {
-          ssr: false,
-          requiresAuth: false,
-        },
-      },
+    },
 {
       path: "/page-ssr",
       meta: {
