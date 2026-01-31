@@ -28,6 +28,13 @@ A minimalist vanilla JavaScript framework with support for Server-Side Rendering
     - [Custom Nested Layouts](#custom-nested-layouts)
   - [⏳ Suspense (Streaming)](#-suspense-streaming)
   - [🔄 Reactive System](#-reactive-system)
+    - [Available Functions](#available-functions)
+      - [`reactive(value)`](#reactivevalue)
+      - [`effect(fn)`](#effectfn)
+      - [`computed(getter)`](#computedgetter)
+      - [`watch(source, callback, options)`](#watchsource-callback-options)
+    - [In Components](#in-components)
+    - [Reactivity Comparison](#reactivity-comparison)
   - [📝 Template Syntax](#-template-syntax)
     - [Interpolation](#interpolation)
     - [Conditionals](#conditionals)
@@ -50,6 +57,7 @@ A minimalist vanilla JavaScript framework with support for Server-Side Rendering
   - [🏗️ Rendering Flow](#️-rendering-flow)
     - [SSR (Server-Side Rendering)](#ssr-server-side-rendering)
     - [CSR (Client-Side Rendering)](#csr-client-side-rendering)
+    - [ISR (Incremental Static Regeneration)](#isr-incremental-static-regeneration)
   - [🗺️ Roadmap](#️-roadmap)
 
 ## ✨ Key Features
@@ -66,6 +74,7 @@ A minimalist vanilla JavaScript framework with support for Server-Side Rendering
 - 📝 **Template Syntax**: Familiar directives (`v-if`, `v-for`, `@click`, etc.)
 - 🌐 **SPA Navigation**: Client-side routing without page reloads
 - 🔌 **Zero Config**: No manual route registration needed
+- 📦 **Pure JavaScript**: No TypeScript to focus on core functionality without build complexity
 
 ## �📁 Project Structure
 
@@ -522,42 +531,152 @@ Allows showing a fallback while content loads asynchronously:
 
 ## 🔄 Reactive System
 
-The reactive system allows creating variables that automatically update the UI:
+The reactive system provides a Vue-like reactivity API with automatic dependency tracking and UI updates.
+
+### Available Functions
+
+#### `reactive(value)`
+
+Creates a reactive proxy that automatically tracks dependencies and triggers effects when changed.
+
+**Use when:** You need reactive state that automatically updates the UI.
+
+```js
+import { reactive } from ".app/reactive.js";
+
+// Reactive primitives (wrapped in .value)
+const counter = reactive(0);
+const name = reactive("Alice");
+counter.value++; // Triggers UI update
+
+// Reactive objects (direct property access)
+const state = reactive({ count: 0, user: "Alice" });
+state.count++; // Triggers UI update
+state.user = "Bob"; // Triggers UI update
+```
+
+#### `effect(fn)`
+
+Creates a side effect that automatically re-runs when its reactive dependencies change.
+
+**Use when:** You need to perform side effects (logging, API calls, DOM manipulation) based on reactive state.
+
+```js
+import { reactive, effect } from ".app/reactive.js";
+
+const count = reactive(0);
+
+// Effect runs immediately and on every count change
+const cleanup = effect(() => {
+  console.log(`Count is: ${count.value}`);
+  document.title = `Count: ${count.value}`;
+});
+
+count.value++; // Effect runs again
+count.value++; // Effect runs again
+
+cleanup(); // Stop the effect
+```
+
+#### `computed(getter)`
+
+Creates a computed reactive value that automatically recalculates when its dependencies change.
+
+**Use when:** You need derived state that depends on other reactive values.
 
 ```js
 import { reactive, computed } from ".app/reactive.js";
 
-// Create reactive state
-const counter = reactive(0);
-const name = reactive("Alice");
+const price = reactive(100);
+const quantity = reactive(2);
 
-// Computed values (auto-update when dependencies change)
-const doubleCount = computed(() => counter.value * 2);
+// Computed value automatically updates
+const total = computed(() => price.value * quantity.value);
 
-// Update reactive values
-counter.value++; // UI automatically updates
+console.log(total.value); // 200
+price.value = 150;
+console.log(total.value); // 300 (automatically recalculated)
 ```
 
-**In components:**
+#### `watch(source, callback, options)`
+
+Watches a reactive source and runs a callback when its value changes.
+
+**Use when:** You need to react to specific state changes with custom logic (different from `effect`).
+
+```js
+import { reactive, watch } from ".app/reactive.js";
+
+const count = reactive(0);
+
+// Watch runs only when count changes (not immediately)
+watch(
+  () => count.value,
+  (newValue, oldValue, onCleanup) => {
+    console.log(`Count changed from ${oldValue} to ${newValue}`);
+    
+    // Cleanup function for previous effect
+    onCleanup(() => {
+      console.log('Cleaning up previous watch effect');
+    });
+  },
+  { immediate: false } // Run immediately on setup
+);
+
+count.value++; // Callback runs
+```
+
+### In Components
 
 ```html
 <script client>
-  import { reactive, computed } from ".app/reactive.js";
+  import { reactive, computed, effect, watch } from ".app/reactive.js";
 
+  // Reactive state
   const count = reactive(0);
+  const step = reactive(1);
+
+  // Computed value
   const doubled = computed(() => count.value * 2);
 
+  // Effect for side effects
+  effect(() => {
+    console.log(`Count changed to: ${count.value}`);
+  });
+
+  // Watcher for specific logic
+  watch(
+    () => count.value,
+    (newVal, oldVal) => {
+      if (newVal > 10) {
+        console.warn('Count is getting high!');
+      }
+    }
+  );
+
   function increment() {
-    count.value++;
+    count.value += step.value;
   }
 </script>
 
 <template>
-  <p>Count: {{count}}</p>
-  <p>Doubled: {{doubled}}</p>
-  <button @click="increment">Increment</button>
+  <div>
+    <p>Count: {{count}}</p>
+    <p>Doubled: {{doubled}}</p>
+    <p>Step: {{step}}</p>
+    <button @click="increment">Increment by {{step}}</button>
+  </div>
 </template>
 ```
+
+### Reactivity Comparison
+
+| Function | When to Use | Auto-runs | Returns |
+|----------|-------------|-----------|----------|
+| `reactive()` | Create reactive state | No | Proxy object |
+| `effect()` | Side effects (logging, DOM, etc.) | Yes (immediately + on changes) | Cleanup function |
+| `computed()` | Derived/calculated values | Yes (on dependency change) | Reactive value |
+| `watch()` | React to specific changes | Optional (with `immediate`) | Nothing |
 
 ## 📝 Template Syntax
 
@@ -723,13 +842,31 @@ Add the `data-prefetch` attribute to any link to prefetch the page when it enter
 
 ## 🎨 Styling
 
-The project uses **Tailwind CSS**. Styles are compiled automatically:
+The project uses **Tailwind CSS v4** via CDN for simplicity and zero configuration.
+
+**Why CDN?** 
+- ✅ No build step required
+- ✅ Instant setup
+- ✅ Automatic updates
+- ✅ Perfect for prototyping and learning
+
+**Usage:**
 
 ```html
 <div class="flex items-center justify-center p-4 bg-blue-500">
   <h1 class="text-white text-2xl">Title</h1>
 </div>
 ```
+
+**Compilation:**
+
+During development, Tailwind CLI watches your files and compiles styles:
+
+```bash
+pnpm dev  # Runs Tailwind in watch mode + server
+```
+
+The compiled CSS is automatically generated in `.app/client/styles.css`.
 
 ## 🔧 Framework API
 
