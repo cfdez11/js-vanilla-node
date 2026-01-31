@@ -22,7 +22,7 @@ const CLIENT_APP_DIR = CLIENT_DIR;
 export const SERVER_APP_DIR = path.join(SERVER_DIR, "server");
 const CACHE_DIR = path.join(SERVER_APP_DIR, "_cache");
 export const CLIENT_COMPONENTS_DIR = path.join(CLIENT_APP_DIR, "_components");
-const COMPONENTS_DIR = path.join(ROOT_DIR, "components");
+const SERVER_UTILS_DIR = path.join(SERVER_APP_DIR, "utils");
 export const CLIENT_SERVICES_DIR = path.join(CLIENT_APP_DIR, "services");
 export const ROOT_HTML_DIR = path.join(SERVER_APP_DIR, "root.html");
 
@@ -512,7 +512,7 @@ export async function saveServerRoutesFile(serverRoutes) {
     `;
 
   await writeFile(
-    path.join(SERVER_APP_DIR, "_routes.js"), `
+    path.join(SERVER_UTILS_DIR, "_routes.js"), `
       ${commentsServer}
       export const routes = [
         ${serverRoutes.join(",\n")}
