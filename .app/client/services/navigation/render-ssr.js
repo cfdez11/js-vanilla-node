@@ -57,6 +57,41 @@ function processSSRMain(buffer, parser, mainEl) {
 }
 
 /**
+ * Extracts `<template id="...">` elements from the stream buffer and appends
+ * them to the document so the Suspense hydration script can find them by ID.
+ *
+ * When a Suspense boundary resolves the server streams:
+ *   <template id="suspense-X-content">…real content…</template>
+ *   <script src="hydrate.js" data-target="suspense-X" data-source="suspense-X-content"></script>
+ *
+ * `hydrate.js` looks up the template by ID and swaps the fallback placeholder
+ * with its content. The template must be in the DOM before the script runs —
+ * this function is called before `processSSRScripts`, guaranteeing that order.
+ *
+ * @param {string} buffer - The HTML buffer.
+ * @param {DOMParser} parser - DOMParser instance.
+ * @returns {string} Remaining buffer after extracting all complete <template> tags.
+ */
+function processSSRTemplates(buffer, parser) {
+  const regex = /<template\b[^>]*>[\s\S]*?<\/template>/gi;
+  let match;
+  let lastIndex = -1;
+
+  while ((match = regex.exec(buffer)) !== null) {
+    const doc = parser.parseFromString(match[0], "text/html");
+    const template = doc.querySelector("template");
+    // Only insert templates with an id — those are Suspense replacement payloads.
+    // Regular <template> tags inside <main> are already handled by processSSRMain.
+    if (template?.id) {
+      document.body.appendChild(template);
+    }
+    lastIndex = match.index + match[0].length;
+  }
+
+  return lastIndex !== -1 ? buffer.slice(lastIndex) : buffer;
+}
+
+/**
  * Processes <script> elements from an HTML buffer, executes inline scripts,
  * and injects external scripts into the DOM if they don't exist yet.
  *
