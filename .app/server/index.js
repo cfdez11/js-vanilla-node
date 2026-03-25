@@ -37,6 +37,27 @@ app.use(
 
 app.get("/revalidate", revalidatePath);
 
+// HMR SSE endpoint — dev only 
+// Browsers connect here and receive a `reload` event whenever a .html file changes.
+// In production this block is skipped entirely so there is no memory or handle overhead.
+if (process.env.NODE_ENV !== "production") {
+  const { hmrEmitter } = await import("./utils/hmr.js");
+
+  app.get("/.app/hmr", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const onReload = (filename) => {
+      res.write(`event: reload\ndata: ${filename}\n\n`);
+    };
+
+    hmrEmitter.on("reload", onReload);
+    req.on("close", () => hmrEmitter.off("reload", onReload));
+  });
+}
+
 const registerSSRRoutes = (app, routes) => {
   routes.forEach((route) => {
     app.get(

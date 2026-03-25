@@ -7,6 +7,16 @@ import { getPagePath } from "./files.js";
 import { renderPageWithLayout } from "./component-processor.js";
 import { routes } from "./_routes.js";
 
+/**
+ * Routes currently being regenerated in the background.
+ *
+ * When an ISR page is stale we serve the cached version immediately and kick off
+ * a background re-render. This Set prevents multiple concurrent requests from
+ * all triggering their own regeneration for the same route simultaneously —
+ * only the first one wins; the others get the stale cache until it is replaced.
+ */
+const revalidatingRoutes = new Set();
+
 const FALLBACK_ERROR_HTML = `
   <!DOCTYPE html>
   <html>
@@ -125,6 +135,28 @@ const endStreamResponse = (res, htmlChunks) => {
  * @throws {Error}
  *   Throws if rendering or streaming fails before the response is committed.
  */
+
+/**
+ * Re-renders a stale ISR page and saves the result to cache without sending
+ * any HTTP response.
+ *
+ * Renders with `awaitSuspenseComponents = true` so all Suspense boundaries
+ * are resolved synchronously and the full HTML is available in one pass.
+ *
+ * @param {string} pagePath    - Absolute path to the page .html file.
+ * @param {object} context     - Request context (provides req.params for getData).
+ * @param {string} cacheKey    - Normalised pathname used as the ISR cache key.
+ */
+async function revalidateInBackground(pagePath, context, cacheKey) {
+  try {
+    // awaitSuspenseComponents=true resolves all suspense boundaries synchronously
+    // so we get the complete HTML in a single renderPageWithLayout call.
+    const { html } = await renderPageWithLayout(pagePath, context, true);
+    await saveCachedComponentHtml({ componentPath: cacheKey, html });
+  } catch (error) {
+    console.error(`[ISR] Background revalidation failed for ${cacheKey}:`, error.message);
+  }
+}
 async function renderAndSendPage({
   pageName,
   statusCode = 200,
@@ -147,8 +179,21 @@ async function renderAndSendPage({
       revalidateSeconds: revalidateSeconds,
     });
 
-    if(cachedHtml && !isStale) {
+    if (cachedHtml && !isStale) {
       sendResponse(context.res, statusCode, cachedHtml);
+      return;
+    }
+
+    // Stale-while-revalidate: serve stale content immediately so the
+    // user never waits for a re-render, then regenerate the page in the background.
+    // The lock prevents multiple concurrent requests from all re-rendering at once.
+    if (cachedHtml && isStale) {
+      sendResponse(context.res, statusCode, cachedHtml);
+      if (!revalidatingRoutes.has(isrCacheKey)) {
+        revalidatingRoutes.add(isrCacheKey);
+        revalidateInBackground(pagePath, context, isrCacheKey)
+          .finally(() => revalidatingRoutes.delete(isrCacheKey));
+      }
       return;
     }
   }
@@ -256,6 +301,13 @@ export async function handlePageRequest(req, res, route) {
   try {
     await renderAndSendPage({ pageName, context, route });
   } catch (e) {
+    // redirect() in a server script throws a structured error.
+    // Intercept it before the generic 500 handler so the browser gets a proper redirect.
+    if (e.redirect) {
+      res.redirect(e.redirect.statusCode, e.redirect.path);
+      return;
+    }
+
     const errorData = {
       message: e.message || "Internal server error",
       code: 500,

@@ -4,6 +4,29 @@ import { compileTemplateToHTML } from "./template.js";
 import { getOriginalRoutePath, getPageFiles, getRoutePath, saveClientComponentModule, saveClientRoutesFile, saveComponentHtmlDisk, saveServerRoutesFile, readFile, getImportData, generateComponentId, adjustClientModulePath, PAGES_DIR, ROOT_HTML_DIR, getLayoutPaths } from "./files.js";
 import { renderComponents } from "./streaming.js";
 import { getRevalidateSeconds } from "./cache.js";
+import { withCache } from "./data-cache.js";
+
+/**
+ * Throws a structured redirect error that propagates out of getData and is
+ * caught by the router to issue an HTTP redirect response (FEAT-02).
+ *
+ * Available automatically inside every <script server> block — no import needed.
+ *
+ * @param {string} redirectPath     - The path or URL to redirect to.
+ * @param {number} [statusCode=302] - HTTP redirect status (301, 302, 307, 308).
+ * @throws {Error} Always throws — use inside getData to abort rendering.
+ *
+ * @example
+ * async function getData({ req }) {
+ *   if (!VALID_CITIES.includes(req.params.city)) redirect('/not-found', 302);
+ *   return { city: req.params.city };
+ * }
+ */
+function redirect(redirectPath, statusCode = 302) {
+  const err = new Error("REDIRECT");
+  err.redirect = { path: redirectPath, statusCode };
+  throw err;
+}
 
 /**
  * In-memory cache for parsed `.html` component files.
@@ -54,12 +77,28 @@ let rootTemplate = await readFile(ROOT_HTML_DIR);
  *  - `fs.watch` keeps the Node process alive and consumes inotify/kqueue handles
  */
 if (process.env.NODE_ENV !== "production") {
+  // Lazy import — hmr.js is never loaded in production
+  const { hmrEmitter } = await import("./hmr.js");
+
   const watchDirs = [PAGES_DIR, path.join(path.dirname(PAGES_DIR), "components")];
   for (const dir of watchDirs) {
-    watch(dir, { recursive: true }, (_, filename) => {
+    watch(dir, { recursive: true }, async (_, filename) => {
       if (filename?.endsWith(".html")) {
         const fullPath = path.join(dir, filename);
+
+        // 1. Evict all in-memory caches for this file
         processHtmlFileCache.delete(fullPath);
+        processedComponentsInBuild.delete(fullPath);
+
+        // 2. Re-generate client bundle so the browser gets fresh JS (FEAT-03 HMR)
+        try {
+          await generateComponentAndFillCache(fullPath);
+        } catch (e) {
+          console.error(`[HMR] Re-generation failed for ${filename}:`, e.message);
+        }
+
+        // 3. Notify connected browsers to reload
+        hmrEmitter.emit("reload", filename);
       }
     });
   }
@@ -67,6 +106,7 @@ if (process.env.NODE_ENV !== "production") {
   // root.html is a single file — watch it directly
   watch(ROOT_HTML_DIR, async () => {
     rootTemplate = await readFile(ROOT_HTML_DIR);
+    hmrEmitter.emit("reload", "root.html");
   });
 }
 
@@ -243,7 +283,11 @@ async function _processHtmlFile(filePath) {
       const AsyncFunction = Object.getPrototypeOf(
         async function () { }
       ).constructor;
+      // `redirect` and `withCache` are the first two params so they are in
+      // scope for the script closure — including inside getData.
       const fn = new AsyncFunction(
+        "redirect",
+        "withCache",
         ...Object.keys(imports),
         `
         ${cleanedScript}
@@ -256,7 +300,7 @@ async function _processHtmlFile(filePath) {
       );
 
       try {
-        const result = await fn(...Object.values(imports));
+        const result = await fn(redirect, withCache, ...Object.values(imports));
         getData = result.getData;
         getStaticPaths = result.getStaticPaths;
         getMetadata = result.metadata ? () => result.metadata : result.getMetadata;
@@ -477,10 +521,13 @@ async function renderLayouts(pagePath, pageContent, pageHead = {}) {
     }
   }
 
-  // wrap in root — rootTemplate is pre-loaded at module level (see PERF-02)
+  // wrap in root — rootTemplate is pre-loaded at module level
+  // devMode exposes NODE_ENV to root.html so it can conditionally render the
+  // HMR client script only in development
   currentContent = compileTemplateToHTML(rootTemplate, {
     ...pageHead,
     metadata: deepMetadata,
+    devMode: process.env.NODE_ENV !== "production",
     props: {
       children: currentContent
     }
