@@ -125,7 +125,6 @@ async function processServerComponents(html, serverComponents) {
  */
 async function renderClientComponents(html, clientComponents) {
   let processedHtml = html;
-  const allMatches = [];
   const allScripts = [];
 
   for (const [componentName, { originalPath }] of clientComponents.entries()) {
@@ -150,7 +149,6 @@ async function renderClientComponents(html, clientComponents) {
       };
 
       replacements.push(matchData);
-      allMatches.push(matchData);
     }
 
     // Render in reverse order to maintain indices

@@ -1130,7 +1130,26 @@ async function saveClientComponent({
  * @returns {Promise<"Server component generated" | "Client component generated">}
  * Indicates which type of artifact was generated.
  */
+/**
+ * Tracks which component files have already been processed during the current
+ * build run
+ *
+ * Shared components (e.g. `UserCard`) are imported by multiple pages, so
+ * `generateComponentAndFillCache` could be invoked for the same file path
+ * dozens of times — once per page that imports it. Without this guard every
+ * invocation would re-run `generateServerComponentHTML`, write the same files
+ * to disk multiple times, and schedule redundant recursive calls for that
+ * component's own dependencies.
+ *
+ * The Set is cleared at the start of `generateComponentsAndFillCache` so that
+ * a second build run (e.g. hot-reload) starts with a clean slate.
+ */
+const processedComponentsInBuild = new Set();
+
 async function generateComponentAndFillCache(filePath) {
+  if (processedComponentsInBuild.has(filePath)) return 'Already processed';
+  processedComponentsInBuild.add(filePath);
+
   const urlPath = getRoutePath(filePath);
 
   const {
@@ -1208,6 +1227,9 @@ async function generateComponentAndFillCache(filePath) {
  * Build completion message.
  */
 export async function generateComponentsAndFillCache() {
+  // Reset the deduplication set so repeated build runs start clean
+  processedComponentsInBuild.clear();
+
   const pagesFiles = await getPageFiles({ layouts: true });
 
   const generateComponentsPromises = pagesFiles.map((file) =>
@@ -1284,16 +1306,20 @@ async function getRouteFileData(file) {
     typeof getData === "function"
   );
 
-  data.serverRoutes.push(`{
-    path: "${filePath}",
-    serverPath: "${urlPath}",
-    isNotFound: ${file.path.includes("/not-found/")},
+  // Push a plain object — no serialisation needed.
+  // Previously this was a hand-crafted JS string that generateRoutes() had to
+  // eval() back into an object. Using a plain object lets saveServerRoutesFile
+  // serialise with JSON.stringify and lets generateRoutes() return the array directly.
+  data.serverRoutes.push({
+    path: filePath,
+    serverPath: urlPath,
+    isNotFound: file.path.includes("/not-found/"),
     meta: {
-      ssr: ${!canCSR},
+      ssr: !canCSR,
       requiresAuth: false,
-      revalidate: "${metadata?.revalidate ?? 0}" ,
+      revalidate: metadata?.revalidate ?? 0,
     },
-  }`);
+  });
 
 
   if (!canCSR) {
@@ -1418,7 +1444,25 @@ export async function generateRoutes() {
     saveServerRoutesFile(serverRoutes),
   ]);
 
-  return {
-    serverRoutes: serverRoutes.map(r => eval(`(${r})`)),
-  };
+  // serverRoutes is already an array of plain objects — no eval() needed (BUILD-03 fix)
+  return { serverRoutes };
+}
+
+/**
+ * Single-pass build entry point.
+ *
+ * Previously `prebuild.js` and `index.js` called `generateComponentsAndFillCache`
+ * and `generateRoutes` as two independent steps. Both steps processed the same
+ * page files: the first populated `processHtmlFileCache`, the second hit the
+ * cache, but they were still two separate async chains.
+ *
+ * `build()` runs both steps sequentially and returns the server routes so
+ * callers need only one import and one await.
+ *
+ * @async
+ * @returns {Promise<{ serverRoutes: Array<Object> }>}
+ */
+export async function build() {
+  await generateComponentsAndFillCache();
+  return generateRoutes();
 }

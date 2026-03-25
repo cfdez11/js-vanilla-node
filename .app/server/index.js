@@ -16,11 +16,9 @@ if (process.env.NODE_ENV === "production") {
     process.exit(1);
   }
 } else {
-  const { generateComponentsAndFillCache, generateRoutes } = await import("./utils/component-processor.js");
-  await generateComponentsAndFillCache();
-  console.log("Components generated.");
-  const result = await generateRoutes();
-  console.log("Routes generated.");
+  const { build } = await import("./utils/component-processor.js");
+  const result = await build();
+  console.log("Components and routes generated.");
   serverRoutes = result.serverRoutes;
 }
 
