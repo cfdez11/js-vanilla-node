@@ -2,17 +2,38 @@ import { parseDocument, DomUtils } from "htmlparser2";
 import { render } from "dom-serializer";
 
 /**
- * return value by evaluating it against provided data
+ * Compiled-function cache.
+ *
+ * `Function(...keys, body)` compiles a new function object on every call.
+ * With ~20 template expressions and 100 req/s that is ~2000 allocations/s
+ * that the GC has to reclaim. The compiled function only depends on the
+ * expression string and the names of the scope keys — not their values —
+ * so it can be reused across requests by calling it with different arguments.
+ *
+ * Key format: `"<expression>::<key1>,<key2>,..."` — must include both the
+ * expression and the key names because the same expression with a different
+ * scope shape produces a different function signature.
+ */
+const fnCache = new Map();
+
+/**
+ * Evaluates a template expression against the provided data scope.
+ *
+ * The compiled `Function` is cached by expression + scope key names so it is
+ * only created once per unique (expression, scope shape) pair.
+ *
  * @param {string} expression
  * @param {object} scope
  * @returns {any}
  */
 function getDataValue(expression, scope) {
+  const keys = Object.keys(scope);
+  const cacheKey = `${expression}::${keys.join(",")}`;
+  if (!fnCache.has(cacheKey)) {
+    fnCache.set(cacheKey, Function(...keys, `return (${expression})`));
+  }
   try {
-    return Function(
-      ...Object.keys(scope),
-      `return (${expression})`
-    )(...Object.values(scope));
+    return fnCache.get(cacheKey)(...Object.values(scope));
   } catch (e) {
     return "";
   }
@@ -190,9 +211,45 @@ function processNode(node, scope, previousRendered = false) {
  * @returns {string}
  *
  */
+/**
+ * Parsed-template cache (PERF-05).
+ *
+ * `parseHTMLToNodes` runs `parseDocument` (htmlparser2) on every call, which
+ * tokenises and builds a full DOM tree from the template string. The template
+ * string is constant between requests — only `data` changes — so the resulting
+ * tree can be cached and deep-cloned before each processing pass.
+ *
+ * `structuredClone` is used to deep-clone the cached nodes. htmlparser2 nodes
+ * are plain objects (no functions / Symbols), so structuredClone handles them
+ * correctly including the circular parent ↔ children references.
+ *
+ * Key:   raw template string
+ * Value: array of parsed DOM nodes (never mutated — always clone before use)
+ */
+const parsedTemplateCache = new Map();
+
+/**
+ * Compiles a Vue-like HTML template string into a rendered HTML string.
+ *
+ * Parsing is performed only on the first call for a given template string.
+ * Subsequent calls clone the cached node tree and process the clone directly,
+ * avoiding repeated `parseDocument` invocations.
+ *
+ * @param {string} template
+ * @param {{
+ *  [name: string]: string,
+ *  clientScripts?: string[],
+ *  metadata?: { title?: string, description?: string }
+ * }} data
+ * @returns {string}
+ */
 export function compileTemplateToHTML(template, data = {}) {
   try {
-    const nodes = parseHTMLToNodes(template);
+    if (!parsedTemplateCache.has(template)) {
+      parsedTemplateCache.set(template, parseHTMLToNodes(template));
+    }
+    // Clone before processing — processNode mutates the nodes in place
+    const nodes = structuredClone(parsedTemplateCache.get(template));
     const processed = nodes
       .map((n) => processNode(n, data))
       .flat()
