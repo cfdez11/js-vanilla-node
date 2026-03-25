@@ -1,17 +1,28 @@
 import express from "express";
-import {
-  generateComponentsAndFillCache,
-  generateRoutes,
-} from "./utils/component-processor.js";
 import { handlePageRequest, revalidatePath } from "./utils/router.js";
 import { initializeDirectories, CLIENT_DIR } from "./utils/files.js";
 
 await initializeDirectories();
-await generateComponentsAndFillCache();
-console.log("Components generated.");
 
-const { serverRoutes } = await generateRoutes();
-console.log("Routes generated.");
+let serverRoutes;
+
+if (process.env.NODE_ENV === "production") {
+  try {
+    const { routes } = await import("./utils/_routes.js");
+    serverRoutes = routes;
+    console.log("Routes loaded.");
+  } catch {
+    console.error("ERROR: No build found. Run 'pnpm build' before starting in production.");
+    process.exit(1);
+  }
+} else {
+  const { generateComponentsAndFillCache, generateRoutes } = await import("./utils/component-processor.js");
+  await generateComponentsAndFillCache();
+  console.log("Components generated.");
+  const result = await generateRoutes();
+  console.log("Routes generated.");
+  serverRoutes = result.serverRoutes;
+}
 
 const app = express();
 
@@ -48,7 +59,7 @@ app.use(async (req, res) => {
   res.status(404).send("Page not found");
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

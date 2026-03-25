@@ -58,6 +58,9 @@ A minimalist vanilla JavaScript framework with support for Server-Side Rendering
     - [SSR (Server-Side Rendering)](#ssr-server-side-rendering)
     - [CSR (Client-Side Rendering)](#csr-client-side-rendering)
     - [ISR (Incremental Static Regeneration)](#isr-incremental-static-regeneration)
+    - [Server Startup](#server-startup)
+    - [Build Process](#build-process)
+    - [Client Hydration](#client-hydration)
   - [🗺️ Roadmap](#️-roadmap)
 
 ## ✨ Key Features
@@ -917,10 +920,13 @@ const { search } = useQueryParams();
 ## 📦 Available Scripts
 
 ```bash
-pnpm dev          # Development server (auto-reloads on changes)
-pnpm start        # Production server
-pnpm format       # Format code with Biome
+pnpm dev          # Development server: builds + watches (auto-reloads on changes)
+pnpm build        # Production build: generates routes, client bundles and minifies CSS
+pnpm start        # Production server: requires a prior pnpm build
+pnpm biome check --write .  # Format and lint with Biome
 ```
+
+> ⚠️ `pnpm start` requires `pnpm build` to have been run first. In production the server loads pre-built routes from `_routes.js` without executing the build pipeline.
 
 ## 🏗️ Rendering Flow
 
@@ -1021,6 +1027,7 @@ sequenceDiagram
         Navigation ->> Navigation: history.pushState({}, "", path)
         
         alt Route is SSR (meta.ssr = true)
+            Navigation ->> Navigation: layoutRenderer.reset()
             Navigation ->> Browser: fetch(path, { signal })
             Browser -->> Navigation: Response stream
             Navigation ->> Navigation: renderSSRPage(path, signal)
@@ -1028,6 +1035,11 @@ sequenceDiagram
             Navigation ->> Hydrator: hydrateComponents()
             Note over Hydrator: Hydrate streamed components
         else Route is CSR (meta.ssr = false)
+            alt route.meta.requiresAuth && !app.Store.loggedIn
+                Navigation ->> Browser: location.href = "/account/login"
+            else route.meta.guestOnly && app.Store.loggedIn
+                Navigation ->> Browser: location.href = "/account"
+            end
             Navigation ->> Cache: loadRouteComponent(route.path, route.component)
             
             alt Component cached
@@ -1134,7 +1146,7 @@ sequenceDiagram
                     Router ->> Client: sendResponse(res, 200, cachedHtml)
                     Note over Router,Client: Instant response from cache<br/>No regeneration needed
                 else Cache stale (isStale = true)
-                    Note over Router: Continue to regeneration<br/>Serve stale content while regenerating
+                    Note over Router: Continue to regeneration<br/>Client waits for fresh content (blocking)
                 end
             else No cache exists
                 FileSystem -->> Cache: { html: null }
@@ -1194,6 +1206,151 @@ sequenceDiagram
 5. **Background Save**: After regeneration, saves to cache for future requests
 6. **Streaming Support**: Handles suspense components and saves complete HTML
 7. **Error Handling**: Prevents caching if errors occur during streaming
+
+### Server Startup
+
+Shows how `index.js` behaves differently in production vs development.
+
+```mermaid
+---
+config:
+  theme: mc
+---
+sequenceDiagram
+        autonumber
+        participant CLI
+        participant index.js
+        participant Files
+        participant ComponentProcessor
+        participant RoutesFile as _routes.js (disk)
+
+        CLI ->> index.js: node .app/server/index.js
+
+        index.js ->> Files: initializeDirectories()
+        Files -->> index.js: Directories ready (_cache/, _components/, ...)
+
+        alt NODE_ENV = "production"
+            index.js ->> RoutesFile: import("./utils/_routes.js")
+            alt _routes.js exists (pnpm build was run)
+                RoutesFile -->> index.js: { routes }
+                Note over index.js: Routes loaded instantly<br/>No build work done
+            else _routes.js not found
+                index.js ->> CLI: ERROR: Run 'pnpm build' first
+                index.js ->> index.js: process.exit(1)
+            end
+        else NODE_ENV != "production" (development)
+            index.js ->> ComponentProcessor: generateComponentsAndFillCache()
+            Note over ComponentProcessor: Scan pages/, render static HTML,<br/>generate client JS bundles
+            ComponentProcessor -->> index.js: Components and cache ready
+            index.js ->> ComponentProcessor: generateRoutes()
+            ComponentProcessor ->> RoutesFile: Write server _routes.js
+            ComponentProcessor ->> RoutesFile: Write client _routes.js
+            ComponentProcessor -->> index.js: { serverRoutes }
+        end
+
+        index.js ->> index.js: registerSSRRoutes(app, serverRoutes)
+        index.js ->> index.js: app.listen(PORT)
+        index.js -->> CLI: Server running on port 3000
+```
+
+### Build Process
+
+Shows what `pnpm build` does step by step.
+
+```mermaid
+---
+config:
+  theme: mc
+---
+flowchart TD
+    A([pnpm build]) --> B[node .app/server/prebuild.js]
+    B --> C[initializeDirectories\nCreate _cache/, _components/]
+    C --> D[generateComponentsAndFillCache]
+
+    D --> E[getPageFiles with layouts=true]
+    E --> F[For each .html file in pages/]
+
+    F --> G[processHtmlFile\nExtract server script, client script, template]
+    G --> H[Execute server script\nget getData, getMetadata, getStaticPaths]
+    H --> I{Has getStaticPaths?}
+
+    I -->|Yes| J[getStaticPaths\nreturns array of params]
+    I -->|No| K[Single path with empty params]
+
+    J --> L[For each param set:\nrenderHtmlFile with req.params]
+    K --> L
+
+    L --> M{canCSR?\nneverRevalidate AND no server components\nAND no getData}
+    M -->|Yes - CSR page| N[saveClientComponent\nGenerate .js bundle in _components/]
+    M -->|No - SSR/ISR/SSG page| O[saveComponentHtmlDisk\nSave rendered HTML to _cache/]
+
+    N --> P{Has nested server\nor client components?}
+    O --> P
+    P -->|Yes| Q[Recursively process\neach referenced component]
+    P -->|No| R[Page done]
+    Q --> R
+
+    R --> S[generateRoutes]
+    S --> T[getPageFiles without layouts]
+    T --> U[For each page: getRouteFileData\nResolve canCSR, metadata, static paths]
+    U --> V[saveServerRoutesFile\n.app/server/utils/_routes.js]
+    U --> W[saveClientRoutesFile\n.app/client/services/_routes.js]
+
+    V --> X[Tailwind CSS minify\n_input.css → styles.css]
+    W --> X
+    X --> Y([Build complete ✅])
+```
+
+**`canCSR` logic:** A page is treated as CSR (client-only bundle, no server HTML) when all three conditions are true:
+- `revalidate` is `false` or `"never"` (i.e. never needs server refresh)
+- No server components (`<script server>`) in the tree
+- No `getData` function
+
+Otherwise the page is SSR/ISR/SSG and its HTML is pre-rendered into `_cache/`.
+
+### Client Hydration
+
+Shows how `hydrate-client-components.js` mounts interactive components after the HTML is in the DOM.
+
+```mermaid
+---
+config:
+  theme: mc
+---
+sequenceDiagram
+        autonumber
+        participant HTML as Browser DOM
+        participant Script as hydrate-client-components.js
+        participant Observer as MutationObserver
+        participant Module as _components/{name}.js
+
+        HTML ->> Script: <script src="..."> loads (IIFE, non-module)
+        Script ->> Observer: observe(document, childList + subtree)
+        Note over Observer: Watches for nodes added by SSR streaming
+
+        alt document.readyState = "loading"
+            HTML -->> Script: DOMContentLoaded event fires
+            Script ->> Script: hydrateComponents(document)
+            Script ->> Observer: disconnect()
+            Note over Observer: Streaming content already parsed,<br/>observer no longer needed
+        else document already interactive
+            Script ->> Script: hydrateComponents(document) immediately
+        end
+
+        loop For each [data-client:component]:not([data-hydrated="true"])
+            Script ->> Script: Read data-client:component (component name/hash)
+            Script ->> Script: JSON.parse(data-client:props)
+            Script ->> Module: import(/.app/client/_components/${name}.js)
+            Module -->> Script: { hydrateClientComponent }
+            Script ->> Module: hydrateClientComponent(marker, props)
+            Note over Module: Replaces <template> marker with<br/>reactive DOM, binds events
+            Script ->> Script: marker.dataset.hydrated = "true"
+        end
+
+        Note over Script: window.hydrateComponents exposed globally<br/>Called by SPA navigation after each route change
+```
+
+**Key detail:** The `<script>` tag that loads this file has no `type="module"` — it's an IIFE that runs synchronously and exposes `window.hydrateComponents` for the SPA router to call after each navigation.
 
 ## 🗺️ Roadmap
 

@@ -203,7 +203,7 @@ async function renderAndSendPage({
 
   if(isISR && !abortedStream && !errorStream) {
     saveCachedComponentHtml({
-      componentPath: pagePath,
+      componentPath: context.req.url,
       html: htmlChunks.join("")
     });
   }
@@ -293,13 +293,13 @@ export async function handlePageRequest(req, res, route) {
  *   - 500: { error: string } if an unexpected error occurs during revalidation
  *
  * @example
- * // Client request:
- * // POST /revalidate?path=/about
+ * Client request:
+ * POST /revalidate?path=/about
  * 
- * // Response:
- * // {
- * //   "message": "Cache for '/about' marked as stale. It will regenerate on next request."
- * // }
+ * Response:
+ * {
+ *   "message": "Cache for '/about' marked as stale. It will regenerate on next request."
+ * }
  */
 export async function revalidatePath(req, res) {
   try {

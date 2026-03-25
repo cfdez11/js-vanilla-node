@@ -5,7 +5,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node .app/server/index.js",
+    "start": "NODE_ENV=production node .app/server/index.js",
     "dev": "run-p dev:*",
     "dev:css": "npx @tailwindcss/cli -i ./.app/client/input.css -o ./.app/client/styles.css --watch",
     "dev:server": "node --watch .app/server/index.js",

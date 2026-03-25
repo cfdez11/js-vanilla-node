@@ -1,5 +1,5 @@
 import { compileTemplateToHTML } from "./template.js";
-import { getOriginalRoutePath, getPageFiles, getRoutePath, saveClientComponentModule, saveClientRoutesFile, saveComponentHtmlDisk, saveServerRoutesFile, readFile, getImportData, generateComponentId, CLIENT_SERVICES_DIR, CLIENT_COMPONENTS_DIR, adjustClientModulePath, PAGES_DIR, ROOT_HTML_DIR, getLayoutPaths, getRelativePath } from "./files.js";
+import { getOriginalRoutePath, getPageFiles, getRoutePath, saveClientComponentModule, saveClientRoutesFile, saveComponentHtmlDisk, saveServerRoutesFile, readFile, getImportData, generateComponentId, adjustClientModulePath, PAGES_DIR, ROOT_HTML_DIR, getLayoutPaths } from "./files.js";
 import { renderComponents } from "./streaming.js";
 import { getRevalidateSeconds } from "./cache.js";
 
@@ -1221,7 +1221,7 @@ async function getRouteFileData(file) {
     return data;
   }
 
-  const componentsBasePath = getRelativePath(CLIENT_SERVICES_DIR, CLIENT_COMPONENTS_DIR);
+  const componentsBasePath = "/.app/client/_components";
 
   const layoutsImportData = layoutPaths.map((layoutPath) => {
     const urlPath = getRoutePath(layoutPath);
