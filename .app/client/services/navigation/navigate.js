@@ -1,7 +1,7 @@
 import { findRouteWithParams } from "./router.js";
 import { updateRouteParams } from "./use-route-params.js";
 import { renderPage } from "./render-page.js";
-import { renderSSRPage } from "./ssr/render-ssr.js";
+import { renderSSRPage } from "./render-ssr.js";
 
 /**
  * Handles the internal SPA navigation logic.
@@ -52,7 +52,7 @@ export async function navigateInternal({
       return;
     }
 
-    if (route?.meta?.accessOnly && app.Store?.loggedIn) {
+    if (route?.meta?.guestOnly && app.Store?.loggedIn) {
       location.href = "/account";
       return;
     }

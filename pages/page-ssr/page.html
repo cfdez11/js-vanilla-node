@@ -13,12 +13,6 @@
     };
     try {
       const city = cities.madrid;
-
-      if (!city) {
-        // todo: add redirect util to redirect to not found page
-        throw new Error(`Ciudad ${city} no encontrada`)
-      };
-
       const url =
         "https://api.open-meteo.com/v1/forecast?" +
         new URLSearchParams({
