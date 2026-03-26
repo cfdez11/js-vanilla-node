@@ -1,0 +1,85 @@
+<script server>
+  export async function getData (errorData = {}) {
+    return {
+      error: {
+        message: errorData.message || "Internal Server Error",
+        code: errorData.code || 500,
+        details: errorData.details || "No additional details provided.",
+        timestamp: new Date().toLocaleString("en-US"),
+        path: errorData.path || "Unknown path",
+        stack: process.env.NODE_ENV === "development" ? errorData.stack : null,
+      },
+    };
+  }
+
+  export const metadata = {
+    title: "Error - Vanilla JS",
+    description: "An error has occurred in the application",
+  };
+
+</script>
+
+<template>
+  <div class="flex items-center justify-center min-h-[60vh]">
+    <div class="max-w-lg w-full space-y-8 text-center">
+      <!-- Error Icon & Code -->
+      <div class="mx-auto">
+        <div class="text-8xl font-extrabold text-red-600 animate-pulse">
+          {{error.code}}
+        </div>
+        <div class="text-6xl mt-4 animate-bounce">
+          ⚠️
+        </div>
+      </div>
+
+      <!-- Error Message -->
+      <div class="space-y-4">
+        <h1 class="text-3xl font-bold text-gray-900">
+          Oops! Something went wrong
+        </h1>
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p class="text-lg text-red-800 font-medium">
+            {{error.message}}
+          </p>
+          <p x-if="error.stack" class="text-sm text-red-600 mt-2">
+            {{error.details}}
+          </p>
+        </div>
+      </div>
+
+      <!-- Error Info -->
+      <div class="bg-gray-50 rounded-lg p-4 text-left space-y-2">
+        <div class="text-sm text-gray-600">
+          <span class="font-medium">📍 Route:</span> {{error.path}}
+        </div>
+        <div class="text-sm text-gray-600">
+          <span class="font-medium">🕐 Time:</span> {{error.timestamp}}
+        </div>
+        <details x-if="error.stack" class="text-xs text-gray-500 mt-4">
+          <summary class="cursor-pointer font-medium text-gray-700 hover:text-gray-900">🔍 Details </summary>
+          <pre class="mt-2 p-2 bg-gray-100 rounded text-xs overflow-x-auto">{{error.stack}}</pre>
+        </details>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="space-y-4">
+        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+          <a href="/"
+            class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200 no-underline">
+            🏠 Go home
+          </a>
+
+          <button onclick="location.reload()"
+            class="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200">
+            🔄 Retry
+          </button>
+
+          <button onclick="history.back()"
+            class="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200">
+            ⬅️ Go back
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

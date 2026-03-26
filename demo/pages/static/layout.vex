@@ -1,0 +1,17 @@
+<script client>
+
+  /** @type {{ children: node }} */
+  const props = xprops({
+    children: { default: null },
+  });
+
+  console.warn('LAYOUT STATIC RENDERED');
+</script>
+<template>
+  <div class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="bg-white rounded-lg border border-gray-200 p-6 min-h-[60vh]">
+      {{props.children}}
+    </div>
+  </div>
+
+</template>

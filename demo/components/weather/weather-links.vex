@@ -1,0 +1,14 @@
+<script client>
+  /** @type {{ links: { href: string, label: string }[] }} */
+  const props = xprops({
+    links: { default: [] },
+  });
+</script>
+
+<template>
+  <section class="flex justify-end mt-4">
+      <a x-for="link in props.links" :href="link.href" class="text-blue-600 hover:underline font-medium">
+        View {{link.label}} Weather →
+      </a>
+    </section>  
+</template>
