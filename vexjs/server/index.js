@@ -1,0 +1,115 @@
+import express from "express";
+import path from "path";
+import { pathToFileURL } from "url";
+import { handlePageRequest, revalidatePath } from "./utils/router.js";
+import { initializeDirectories, CLIENT_DIR } from "./utils/files.js";
+
+await initializeDirectories();
+
+let serverRoutes;
+
+if (process.env.NODE_ENV === "production") {
+  try {
+    const routesPath = path.join(process.cwd(), ".vexjs", "_routes.js");
+    const { routes } = await import(pathToFileURL(routesPath).href);
+    serverRoutes = routes;
+    console.log("Routes loaded.");
+  } catch {
+    console.error("ERROR: No build found. Run 'pnpm build' before starting in production.");
+    process.exit(1);
+  }
+} else {
+  const { build } = await import("./utils/component-processor.js");
+  const result = await build();
+  console.log("Components and routes generated.");
+  serverRoutes = result.serverRoutes;
+}
+
+const app = express();
+
+// Serve generated client components at /_vexjs/_components/ (before broader /_vexjs mount)
+app.use(
+  "/_vexjs/_components",
+  express.static(path.join(process.cwd(), ".vexjs", "_components"), {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith(".js")) {
+        res.setHeader("Content-Type", "application/javascript");
+      }
+    },
+  })
+);
+
+// Serve generated services (e.g. _routes.js) at /_vexjs/services/ (before broader /_vexjs mount)
+app.use(
+  "/_vexjs/services",
+  express.static(path.join(process.cwd(), ".vexjs", "services"), {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith(".js")) {
+        res.setHeader("Content-Type", "application/javascript");
+      }
+    },
+  })
+);
+
+// Serve framework client files at /_vexjs/
+app.use(
+  "/_vexjs",
+  express.static(CLIENT_DIR, {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith(".js")) {
+        res.setHeader("Content-Type", "application/javascript");
+      }
+    },
+  })
+);
+
+// Serve user's public directory at /
+app.use("/", express.static(path.join(process.cwd(), "public")));
+
+app.get("/revalidate", revalidatePath);
+
+// HMR SSE endpoint — dev only
+if (process.env.NODE_ENV !== "production") {
+  const { hmrEmitter } = await import("./utils/hmr.js");
+
+  app.get("/_vexjs/hmr", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const onReload = (filename) => {
+      res.write(`event: reload\ndata: ${filename}\n\n`);
+    };
+
+    hmrEmitter.on("reload", onReload);
+    req.on("close", () => hmrEmitter.off("reload", onReload));
+  });
+}
+
+const registerSSRRoutes = (app, routes) => {
+  routes.forEach((route) => {
+    app.get(
+      route.serverPath,
+      async (req, res) => await handlePageRequest(req, res, route)
+    );
+  });
+};
+
+registerSSRRoutes(app, serverRoutes);
+
+app.use(async (req, res) => {
+  const notFoundRoute = serverRoutes.find((r) => r.isNotFound);
+  if (notFoundRoute) {
+    return handlePageRequest(req, res, notFoundRoute);
+  }
+
+  res.status(404).send("Page not found");
+});
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+export default app;
