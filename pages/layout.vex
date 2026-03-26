@@ -1,7 +1,7 @@
 <script client>
 
   /** @type {{ children: node }} */
-  const props = vprops({
+  const props = xprops({
     children: { default: null },
   });
 

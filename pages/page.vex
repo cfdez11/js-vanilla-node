@@ -1,7 +1,7 @@
 <script server>
-  import UserCard from "components/user-card.html";
-  import UserCardDelayed from "components/user-card-delayed.html";
-  import UserCardSkeleton from "components/user-card-skeleton.html";
+  import UserCard from "components/user-card.vex";
+  import UserCardDelayed from "components/user-card-delayed.vex";
+  import UserCardSkeleton from "components/user-card-skeleton.vex";
 
   async function getData () {
     return { userId: 123, name: "Alice", attributes: ["admin", "editor"] };
@@ -14,7 +14,7 @@
 </script>
 
 <script client>
-  import Counter from "components/counter.html";
+  import Counter from "components/counter.vex";
 </script>
 
 <template>
@@ -31,7 +31,7 @@
         <h2 class="text-2xl font-semibold mb-3 text-blue-700">1. Server Component (Blocking)</h2>
         <p class="text-gray-700 mb-4">This component is rendered on the server and blocks the initial page load until
           it's ready. All data is fetched before sending HTML to the client:</p>
-        <div v-for="attribute in attributes"
+        <div x-for="attribute in attributes"
           class="inline-block bg-gray-200 text-gray-800 px-4 py-1 rounded-full text-sm font-semibold mb-4 mr-2">
           {{attribute}}
         </div>

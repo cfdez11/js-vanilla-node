@@ -2,7 +2,7 @@
   import { reactive, computed } from ".app/reactive.js";
 
   /** @type {{ start: string }} */
-  const props = vprops({
+  const props = xprops({
     start: { default: 10 },
   });
 
@@ -44,9 +44,9 @@
       </button>
     </div>
 
-    <div v-show="counter" class="flex items-center gap-1 ml-auto p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+    <div x-show="counter" class="flex items-center gap-1 ml-auto p-2 bg-yellow-50 rounded-lg border border-yellow-200">
       <div class="flex flex-wrap gap-1">
-        <span v-for="star in stars" class="text-yellow-500 text-lg">⭐</span>
+        <span x-for="star in stars" class="text-yellow-500 text-lg">⭐</span>
       </div>
     </div>
   </div>

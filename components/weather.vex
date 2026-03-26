@@ -1,5 +1,6 @@
 <script client>
-  import { reactive, watch, computed } from ".app/reactive.js"; 
+  import { reactive, watch, computed } from ".app/reactive.js";
+  import { useRouteParams } from ".app/navigation/index.js";
 
   const weatherCodes = {
     0: { description: "Cielo despejado", icon: "☀️", color: "text-yellow-500" },
@@ -29,15 +30,17 @@
     tokio: { lat: 35.6762, lon: 139.6503, timezone: "Asia/Tokyo", name: "Tokio" },
   };
 
+  const params = useRouteParams();
+  const cityParam = params.city || "madrid";
 
   const state = reactive({
     status: "idle", // idle | loading | success | error
     data: null,
     error: null,
-    selectedCity: 'madrid',
+    selectedCity: cityParam,
   });
 
-  function getWeatherInfo(code) {
+  function getWeatherInfo (code) {
     return (
       weatherCodes[code] || {
         description: "Desconocido",
@@ -47,10 +50,10 @@
     );
   }
 
-  async function fetchWeather(cityName, signal) {
+  async function fetchWeather (cityName, signal) {
     state.status = "loading";
     state.error = null;
-    
+
     try {
       const city = cities[cityName];
       if (!city) throw new Error(`Ciudad ${cityName} no encontrada`);
@@ -124,21 +127,27 @@
     }
   }
 
+  // this is not a good use of watch, because in a normal component, we wi
+  watch(
+    () => cityParam,
+    (city) => state.selectedCity = city,
+    { immediate: true }
+  );
+
   watch(
     () => state.selectedCity,
     async (city, _, onCleanup) => {
-      if(!city) return;
+      if (city === cityParam) return;
 
       const controller = new AbortController();
 
       onCleanup(() => controller.abort());
 
       await fetchWeather(city, controller.signal);
-    },
-    { immediate: true }
+    }
   );
 
-  function changeCity(city) {
+  function changeCity (city) {
     state.selectedCity = city;
   }
 
@@ -157,8 +166,8 @@
           <p class="text-blue-100">Data loaded from client (real-time API)</p>
         </div>
 
-        <div class="flex flex-wrap gap-2">
-          <button v-for="city in Object.keys(cities)" @click="changeCity(city)"
+        <div x-show="!params.city" class="flex flex-wrap gap-2">
+          <button x-for="city in Object.keys(cities)" @click="changeCity(city)"
             class="px-3 py-2 rounded-lg text-sm font-medium transition-all"
             :class="state.selectedCity === city ? 'bg-white text-blue-600' : 'bg-blue-600 text-white hover:bg-blue-700'">
             {{ cities[city]?.name }}
@@ -168,7 +177,7 @@
     </div>
 
     <!-- Loading -->
-    <div v-if="state.status === 'loading' || state.status === 'idle'" class="flex items-center justify-center py-12">
+    <div x-if="state.status === 'loading' || state.status === 'idle'" class="flex items-center justify-center py-12">
       <div class="text-center space-y-4">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
         <p class="text-gray-600">Cargando datos meteorológicos...</p>
@@ -176,7 +185,7 @@
     </div>
 
     <!-- Error -->
-    <div v-else-if="state.status === 'error'" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+    <div x-else-if="state.status === 'error'" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
       <div class="text-red-500 text-4xl mb-4">❌</div>
       <h3 class="text-red-800 font-bold text-lg mb-2">Error al cargar el clima</h3>
       <p class="text-red-600 mb-4">{{ state.error }}</p>
@@ -187,11 +196,11 @@
     </div>
 
     <!-- No data -->
-    <div v-else-if="!state.data" class="text-center py-12" >
+    <div x-else-if="!state.data" class="text-center py-12">
       No hay datos disponibles
     </div>
 
-    <div v-else class="space-y-8">
+    <div x-else class="space-y-8">
       <!-- Current Weather -->
       <div>
         <h3 class="text-xl font-bold text-gray-800 mb-4">Current Weather</h3>
