@@ -8,8 +8,8 @@ Syntax highlighting for **VexJS**, a vanilla JavaScript meta-framework with file
 - Three distinct sections highlighted independently:
   - `<script server>` — Node.js server-side code (runs per request)
   - `<script client>` — Browser-side reactive code
-  - `<template>` — Vue-like HTML with directives
-- Directive highlighting: `v-if`, `v-for`, `v-show`, `:prop`, `@event`
+  - `<template>` — HTML with directives
+- Directive highlighting: `x-if`, `x-for`, `x-show`, `:prop`, `@event`
 - Expression highlighting inside `{{ }}` interpolations
 - Embedded JavaScript language support in script blocks (autocompletion, IntelliSense)
 
@@ -42,12 +42,12 @@ VexJS components use the `.vex` extension (or `.html` under `pages/` and `compon
 1. Open VS Code
 2. Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
 3. Run **Extensions: Install from VSIX...**
-4. Select the `vexjs-0.1.0.vsix` file from the `vscode-extension/` folder
+4. Select the `.vsix` file from the `vscode-extension/` folder
 
 Or via the CLI:
 
 ```bash
-code --install-extension vscode-extension/vexjs-0.1.0.vsix
+code --install-extension vscode-extension/vexjs-x.x.x.vsix
 ```
 
 ### From source (development)
@@ -59,17 +59,35 @@ vsce package                  # generates vexjs-x.x.x.vsix
 code --install-extension vexjs-*.vsix
 ```
 
+## File Icon
+
+VS Code icon themes are mutually exclusive — activating one replaces another entirely. To keep your current icon theme and add the `.vex` icon, configure the association inside your active theme:
+
+**Material Icon Theme** (`settings.json`):
+```json
+"material-icon-theme.files.associations": {
+  "*.vex": "html"
+}
+```
+
+**VSCode Icons** (`settings.json`):
+```json
+"vsicons.associations.files": [
+  { "icon": "html", "extensions": ["vex"], "format": "svg" }
+]
+```
+
+**Any other theme** — most themes use `html` as a reasonable fallback for `.vex` files. Check your theme's documentation for the custom associations setting.
+
+The icon SVG (`icons/vex-file.svg`) is included in this extension if you ever want to reference it manually.
+
 ## Requirements
 
 - VS Code `^1.75.0`
 
-## Extension Settings
-
-No configuration required. The extension activates automatically for `.vex` files and HTML files inside `pages/` and `components/` directories.
-
 ## Known Limitations
 
-- Autocompletion for directives (`v-if`, `v-for`, etc.) is not yet implemented
+- Autocompletion for directives (`x-if`, `x-for`, etc.) is not yet implemented
 - Jump-to-definition for component imports is not yet supported
 - Lint of `{{ }}` expressions is not yet supported
 
