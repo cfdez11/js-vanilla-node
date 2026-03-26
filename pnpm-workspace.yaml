@@ -1,0 +1,4 @@
+packages:
+  - vexjs
+  - demo
+  - vscode-extension
