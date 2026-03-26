@@ -1,11 +1,11 @@
 {
+  "version": "0.2.0",
   "name": "vexjs",
   "displayName": "VexJS",
-  "description": "Syntax highlighting for VexJS framework — <script server>, <script client>, <template> with v-if, v-for, :prop, @event and {{ }} expressions.",
-  "version": "0.1.0",
+  "description": "Syntax highlighting for VexJS framework — <script server>, <script client>, <template> with x-if, x-for, :prop, @event and {{ }} expressions.",
   "publisher": "Vexjs",
   "engines": { "vscode": "^1.75.0" },
-  "categories": ["Programming Languages"],
+  "categories": ["Programming Languages", "Themes"],
   "keywords": ["vexjs", "vex", "framework", "html", "template", "vue-like"],
   "icon": "icon.png",
   "license": "MIT",
@@ -33,6 +33,13 @@
           "source.js.client": "javascript",
           "source.js.expression": "javascript"
         }
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "vexjs-icons",
+        "label": "VexJS Icons",
+        "path": "./icons/vexjs-icon-theme.json"
       }
     ]
   }

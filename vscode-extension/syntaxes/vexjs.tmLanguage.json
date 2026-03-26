@@ -93,43 +93,43 @@
       "end": "(/?>)",
       "endCaptures": { "1": { "name": "punctuation.definition.tag.end.html" } },
       "patterns": [
-        { "include": "#directive-v-for" },
-        { "include": "#directive-v-if-family" },
-        { "include": "#directive-v-show" },
+        { "include": "#directive-x-for" },
+        { "include": "#directive-x-if-family" },
+        { "include": "#directive-x-show" },
         { "include": "#directive-bind-shorthand" },
         { "include": "#directive-on-shorthand" },
-        { "include": "#directive-v-bind-longhand" },
-        { "include": "#directive-v-on-longhand" },
-        { "include": "#directive-v-generic" },
+        { "include": "#directive-x-bind-longhand" },
+        { "include": "#directive-x-on-longhand" },
+        { "include": "#directive-x-generic" },
         { "include": "#html-attribute-string" },
         { "include": "#html-attribute-bare" }
       ]
     },
 
-    "directive-v-for": {
-      "comment": "v-for=\"item in items\"",
-      "name": "meta.directive.v-for.vexjs",
-      "match": "\\b(v-for)=(\"[^\"]*\"|'[^']*')",
+    "directive-x-for": {
+      "comment": "x-for=\"item in items\"",
+      "name": "meta.directive.x-for.vexjs",
+      "match": "\\b(x-for)=(\"[^\"]*\"|'[^']*')",
       "captures": {
         "1": { "name": "keyword.control.loop.vexjs" },
         "2": { "name": "string.directive.vexjs" }
       }
     },
 
-    "directive-v-if-family": {
-      "comment": "v-if, v-else-if, v-else",
+    "directive-x-if-family": {
+      "comment": "x-if, x-else-if, x-else",
       "name": "meta.directive.conditional.vexjs",
-      "match": "\\b(v-else-if|v-if|v-else)(?:=(\"[^\"]*\"|'[^']*'))?",
+      "match": "\\b(x-else-if|x-if|x-else)(?:=(\"[^\"]*\"|'[^']*'))?",
       "captures": {
         "1": { "name": "keyword.control.conditional.vexjs" },
         "2": { "name": "string.directive.vexjs" }
       }
     },
 
-    "directive-v-show": {
-      "comment": "v-show=\"expr\"",
-      "name": "meta.directive.v-show.vexjs",
-      "match": "\\b(v-show)=(\"[^\"]*\"|'[^']*')",
+    "directive-x-show": {
+      "comment": "x-show=\"expr\"",
+      "name": "meta.directive.x-show.vexjs",
+      "match": "\\b(x-show)=(\"[^\"]*\"|'[^']*')",
       "captures": {
         "1": { "name": "keyword.control.visibility.vexjs" },
         "2": { "name": "string.directive.vexjs" }
@@ -158,10 +158,10 @@
       }
     },
 
-    "directive-v-bind-longhand": {
-      "comment": "v-bind:propName=\"expr\"",
-      "name": "meta.directive.v-bind-long.vexjs",
-      "match": "(v-bind:)([a-zA-Z][a-zA-Z0-9_-]*)=(\"[^\"]*\"|'[^']*')",
+    "directive-x-bind-longhand": {
+      "comment": "x-bind:propName=\"expr\"",
+      "name": "meta.directive.x-bind-long.vexjs",
+      "match": "(x-bind:)([a-zA-Z][a-zA-Z0-9_-]*)=(\"[^\"]*\"|'[^']*')",
       "captures": {
         "1": { "name": "keyword.operator.bind.vexjs" },
         "2": { "name": "entity.other.attribute-name.vexjs variable.other.prop.vexjs" },
@@ -169,10 +169,10 @@
       }
     },
 
-    "directive-v-on-longhand": {
-      "comment": "v-on:eventName=\"handler\"",
-      "name": "meta.directive.v-on-long.vexjs",
-      "match": "(v-on:)([a-zA-Z][a-zA-Z0-9_-]*)=(\"[^\"]*\"|'[^']*')",
+    "directive-x-on-longhand": {
+      "comment": "x-on:eventName=\"handler\"",
+      "name": "meta.directive.x-on-long.vexjs",
+      "match": "(x-on:)([a-zA-Z][a-zA-Z0-9_-]*)=(\"[^\"]*\"|'[^']*')",
       "captures": {
         "1": { "name": "keyword.operator.event.vexjs" },
         "2": { "name": "entity.other.attribute-name.vexjs variable.other.event.vexjs" },
@@ -180,10 +180,10 @@
       }
     },
 
-    "directive-v-generic": {
-      "comment": "Any other v-* directive not matched above",
+    "directive-x-generic": {
+      "comment": "Any other x-* directive not matched above",
       "name": "meta.directive.generic.vexjs",
-      "match": "\\b(v-[a-zA-Z][a-zA-Z0-9_-]*)(?:=(\"[^\"]*\"|'[^']*'))?",
+      "match": "\\b(x-[a-zA-Z][a-zA-Z0-9_-]*)(?:=(\"[^\"]*\"|'[^']*'))?",
       "captures": {
         "1": { "name": "keyword.other.directive.vexjs" },
         "2": { "name": "string.directive.vexjs" }

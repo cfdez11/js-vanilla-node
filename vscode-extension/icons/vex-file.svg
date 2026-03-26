@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- File body -->
+  <rect x="3" y="1" width="14" height="18" rx="1.5" ry="1.5" fill="#1a1b2e"/>
+  <!-- Folded corner -->
+  <path d="M14 1 L17 4 L14 4 Z" fill="#7c7fce" opacity="0.5"/>
+  <path d="M14 1 L17 4 H14 Z" fill="#2d2f52"/>
+  <!-- X lines -->
+  <line x1="7"  y1="8.5" x2="13" y2="14.5" stroke="#7c7fce" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="13" y1="8.5" x2="7"  y2="14.5" stroke="#7c7fce" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Center dot -->
+  <circle cx="10" cy="11.5" r="1.2" fill="#f59e0b"/>
+</svg>

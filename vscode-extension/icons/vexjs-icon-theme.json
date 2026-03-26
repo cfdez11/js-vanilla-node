@@ -1,0 +1,13 @@
+{
+  "iconDefinitions": {
+    "_vex": {
+      "iconPath": "./vex-file.svg"
+    }
+  },
+  "fileExtensions": {
+    "vex": "_vex"
+  },
+  "languageIds": {
+    "vexjs": "_vex"
+  }
+}
