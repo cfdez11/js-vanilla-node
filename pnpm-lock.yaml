@@ -20,13 +20,13 @@ importers:
       npm-run-all:
         specifier: ^4.1.5
         version: 4.1.5
-      tailwindcss:
-        specifier: ^4.1.17
-        version: 4.1.17
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.3.8
         version: 2.3.8
+      tailwindcss:
+        specifier: ^4.1.17
+        version: 4.1.17
 
 packages:
 

@@ -66,20 +66,9 @@ VS Code icon themes are mutually exclusive — activating one replaces another e
 **Material Icon Theme** (`settings.json`):
 ```json
 "material-icon-theme.files.associations": {
-  "*.vex": "html"
+  "*.vex": "javascript"
 }
 ```
-
-**VSCode Icons** (`settings.json`):
-```json
-"vsicons.associations.files": [
-  { "icon": "html", "extensions": ["vex"], "format": "svg" }
-]
-```
-
-**Any other theme** — most themes use `html` as a reasonable fallback for `.vex` files. Check your theme's documentation for the custom associations setting.
-
-The icon SVG (`icons/vex-file.svg`) is included in this extension if you ever want to reference it manually.
 
 ## Requirements
 

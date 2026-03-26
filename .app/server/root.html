@@ -1,25 +1,14 @@
 <!DOCTYPE html>
-<html lang="es" class="h-full">
+<html lang="en" class="h-full">
 
 <head>
   <meta charset="UTF-8">
   <title>{{metadata.title}}</title>
   <meta name="description" content="{{metadata.description}}">
-  <link rel="icon" href="/.app/client/favicon.ico" type="image/x-icon">
-  <link rel="stylesheet" href="/.app/client/styles.css">
-  <script type="module" src="/.app/client/services/index.js"></script>
-  <script src="/.app/client/services/hydrate-client-components.js"></script>
-  <!-- hydrate.js exposes a global window.hydrateTarget(targetId, sourceId) that
-       each Suspense replacement payload calls inline instead of loading the file again. -->
-  <script src="/.app/client/services/hydrate.js" id="hydrate-script"></script>
-  <!-- HMR client: connects to /.app/hmr SSE endpoint and reloads on file changes.
-       Only injected in dev mode (devMode = NODE_ENV !== 'production'). -->
-  <script x-if="devMode" src="/.app/client/services/hmr-client.js"></script>
-  {{clientScripts}}
 </head>
 
-<body class="h-full flex flex-col bg-gray-50">
-  <div id="app-root" class="grow flex flex-col">
+<body>
+  <div id="app-root">
     {{props.children}}
   </div>
 </body>

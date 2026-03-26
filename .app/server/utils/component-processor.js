@@ -522,16 +522,27 @@ async function renderLayouts(pagePath, pageContent, pageHead = {}) {
   }
 
   // wrap in root — rootTemplate is pre-loaded at module level
-  // devMode exposes NODE_ENV to root.html so it can conditionally render the
-  // HMR client script only in development
+  const { clientScripts, ...restPageHead } = pageHead;
   currentContent = compileTemplateToHTML(rootTemplate, {
-    ...pageHead,
+    ...restPageHead,
     metadata: deepMetadata,
-    devMode: process.env.NODE_ENV !== "production",
     props: {
       children: currentContent
     }
   });
+
+  // Inject framework internals + page client scripts before </head>
+  // so users don't need to reference framework scripts in their root.html
+  const devMode = process.env.NODE_ENV !== "production";
+  const frameworkScripts = [
+    `<script type="module" src="/.app/client/services/index.js"></script>`,
+    `<script src="/.app/client/services/hydrate-client-components.js"></script>`,
+    `<script src="/.app/client/services/hydrate.js" id="hydrate-script"></script>`,
+    devMode ? `<script src="/.app/client/services/hmr-client.js"></script>` : "",
+    clientScripts || "",
+  ].filter(Boolean).join("\n  ");
+
+  currentContent = currentContent.replace("</head>", `  ${frameworkScripts}\n</head>`);
 
   return currentContent;
 }

@@ -25,7 +25,9 @@ const CACHE_DIR = path.join(SERVER_APP_DIR, "_cache");
 export const CLIENT_COMPONENTS_DIR = path.join(CLIENT_APP_DIR, "_components");
 const SERVER_UTILS_DIR = path.join(SERVER_APP_DIR, "utils");
 export const CLIENT_SERVICES_DIR = path.join(CLIENT_APP_DIR, "services");
-export const ROOT_HTML_DIR = path.join(SERVER_APP_DIR, "root.html");
+const ROOT_HTML_USER = path.join(ROOT_DIR, "root.html");
+const ROOT_HTML_DEFAULT = path.join(SERVER_APP_DIR, "root.html");
+export const ROOT_HTML_DIR = ROOT_HTML_USER;
 
 /**
  * Ensures all required application directories exist.
@@ -359,8 +361,12 @@ export const getPagePath = (pageName) =>
  * Root HTML content.
  */
 export const getRootTemplate = async () => {
-  const rootPath = path.join(SERVER_APP_DIR, "root.html");
-  return await fs.readFile(rootPath, "utf-8");
+  try {
+    await fs.access(ROOT_HTML_USER);
+    return await fs.readFile(ROOT_HTML_USER, "utf-8");
+  } catch {
+    return await fs.readFile(ROOT_HTML_DEFAULT, "utf-8");
+  }
 };
 
 /**
