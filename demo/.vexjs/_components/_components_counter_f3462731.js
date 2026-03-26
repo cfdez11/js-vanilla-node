@@ -1,5 +1,4 @@
-import { reactive, computed } from "/_vexjs/services/reactive"
-import { effect } from '/_vexjs/services/reactive.js';
+import { reactive, computed, effect } from "/_vexjs/services/reactive.js"
 import { html } from '/_vexjs/services/html.js';  
 
     export const metadata = null

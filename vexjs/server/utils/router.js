@@ -295,6 +295,7 @@ export async function handlePageRequest(req, res, route) {
   try {
     await renderAndSendPage({ pageName, context, route });
   } catch (e) {
+    console.error(`[500] Error rendering page "${route.path}":`, e);
     // redirect() in a server script throws a structured error.
     // Intercept it before the generic 500 handler so the browser gets a proper redirect.
     if (e.redirect) {
@@ -321,6 +322,7 @@ export async function handlePageRequest(req, res, route) {
         route,
       });
     } catch (err) {
+      console.warn('error}}}}}}}}}}', err)
       console.error(`Failed to render error page: ${err.message}`);
       sendResponse(res, 500, FALLBACK_ERROR_HTML);
     }

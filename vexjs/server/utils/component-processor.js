@@ -1,7 +1,7 @@
 import { watch } from "fs";
 import path from "path";
 import { compileTemplateToHTML } from "./template.js";
-import { getOriginalRoutePath, getPageFiles, getRoutePath, saveClientComponentModule, saveClientRoutesFile, saveComponentHtmlDisk, saveServerRoutesFile, readFile, getImportData, generateComponentId, adjustClientModulePath, PAGES_DIR, ROOT_HTML_DIR, getLayoutPaths } from "./files.js";
+import { getOriginalRoutePath, getPageFiles, getRoutePath, saveClientComponentModule, saveClientRoutesFile, saveComponentHtmlDisk, saveServerRoutesFile, readFile, getImportData, generateComponentId, adjustClientModulePath, PAGES_DIR, ROOT_HTML_DIR, getLayoutPaths, SRC_DIR, WATCH_IGNORE } from "./files.js";
 import { renderComponents } from "./streaming.js";
 import { getRevalidateSeconds } from "./cache.js";
 import { withCache } from "./data-cache.js";
@@ -80,11 +80,12 @@ if (process.env.NODE_ENV !== "production") {
   // Lazy import — hmr.js is never loaded in production
   const { hmrEmitter } = await import("./hmr.js");
 
-  const watchDirs = [PAGES_DIR, path.join(path.dirname(PAGES_DIR), "components")];
-  for (const dir of watchDirs) {
-    watch(dir, { recursive: true }, async (_, filename) => {
-      if (filename?.endsWith(".vex")) {
-        const fullPath = path.join(dir, filename);
+  // Watch SRC_DIR (configured via vex.config.json `srcDir`, defaults to project root).
+  // Skip any path segment that appears in WATCH_IGNORE to avoid reacting to
+  // changes inside node_modules, build outputs, or other non-source directories.
+  watch(SRC_DIR, { recursive: true }, async (_, filename) => {
+      if (filename?.endsWith(".vex") && !filename.split(path.sep).some(part => WATCH_IGNORE.has(part))) {
+        const fullPath = path.join(SRC_DIR, filename);
 
         // 1. Evict all in-memory caches for this file
         processHtmlFileCache.delete(fullPath);
@@ -101,7 +102,6 @@ if (process.env.NODE_ENV !== "production") {
         hmrEmitter.emit("reload", filename);
       }
     });
-  }
 
   // root.html is a single file — watch it directly
   watch(ROOT_HTML_DIR, async () => {
@@ -971,19 +971,9 @@ async function generateServerComponentHTML(componentPath) {
 export async function processClientComponent(componentName, originalPath, props = {}) {
   const targetId = `client-${componentName}-${Date.now()}`;
 
-  const propsEntries = Object.entries(props)
-    .map(([key, value]) => {
-      // if starts with ${ remove quotes
-      if (typeof value === "string" && value.startsWith("${")) {
-        return `${key}:${value.replace(/^\$\{|\}$/g, "")}`;
-      } else {
-        return `${key}:${JSON.stringify(value)}`;
-      }
-    })
-    .join(",");
-
   const componentImport = generateComponentId(originalPath)
-  const html = `<template id="${targetId}" data-client:component="${componentImport}" data-client:props='${propsEntries ? `\${JSON.stringify({${propsEntries}})}` : "{}"}'></template>`;
+  const propsJson = JSON.stringify(props);
+  const html = `<template id="${targetId}" data-client:component="${componentImport}" data-client:props='${propsJson}'></template>`;
   
   return html;
 }

@@ -32,8 +32,8 @@ import { html } from '/_vexjs/services/html.js';
         </p>
       </div>
     </header>
-    <template id="client-Weather-1774520151211" data-client:component="_components_weather_weather_state_5886c775" data-client:props='{}'></template>
-    <template id="client-WeatherLinks-1774520151211" data-client:component="_components_weather_weather_links_376a02a5" data-client:props='${JSON.stringify({links:links})}'></template>
+    <template id="client-Weather-1774545613070" data-client:component="_components_weather_weather_state_5886c775" data-client:props='{}'></template>
+    <template id="client-WeatherLinks-1774545613070" data-client:component="_components_weather_weather_links_376a02a5" data-client:props='{"links":"${links}"}'></template>
   </div>`;
         if (!root) {
           root = node;

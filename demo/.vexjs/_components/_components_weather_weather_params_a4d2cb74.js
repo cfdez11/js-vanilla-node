@@ -1,6 +1,5 @@
-import { reactive, watch, computed } from "/_vexjs/services/reactive"
+import { reactive, watch, computed, effect } from "/_vexjs/services/reactive.js"
 import { useRouteParams } from "/_vexjs/services/navigation/index.js"
-import { effect } from '/_vexjs/services/reactive.js';
 import { html } from '/_vexjs/services/html.js';  
 
     export const metadata = null

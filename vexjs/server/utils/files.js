@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { watch, existsSync, statSync } from "fs";
+import { watch, existsSync, statSync, readFileSync } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath, pathToFileURL } from "url";
@@ -18,10 +18,78 @@ const __dirname = path.dirname(__filename);
 // Framework's own directory (packages/vexjs/ — 3 levels up from server/utils/)
 const FRAMEWORK_DIR = path.resolve(__dirname, "..", "..");
 // User's project root (where they run the server)
-const PROJECT_ROOT = process.cwd();
+export const PROJECT_ROOT = process.cwd();
 const ROOT_DIR = PROJECT_ROOT;
 
-export const PAGES_DIR = path.resolve(PROJECT_ROOT, "pages");
+/**
+ * User configuration loaded from `vex.config.json` at the project root.
+ *
+ * Supported fields:
+ *   - `srcDir`      {string}   Subfolder that contains pages/, components/ and
+ *                              all user .vex code. Defaults to "." (project root).
+ *                              Example: "app"  →  pages live at app/pages/
+ *   - `watchIgnore` {string[]} Additional directory names to exclude from the
+ *                              dev file watcher, merged with the built-in list.
+ *                              Example: ["dist", "coverage"]
+ *
+ * The file is optional — if absent, all values fall back to their defaults.
+ */
+let _vexConfig = {};
+try {
+  _vexConfig = JSON.parse(readFileSync(path.join(PROJECT_ROOT, "vex.config.json"), "utf-8"));
+} catch {}
+
+/**
+ * Absolute path to the directory that contains the user's source files
+ * (pages/, components/, and any other .vex folders).
+ *
+ * Derived from `srcDir` in vex.config.json, resolved relative to PROJECT_ROOT.
+ * Defaults to PROJECT_ROOT when `srcDir` is not set.
+ *
+ * Changing this allows users to organise all their app code in a single
+ * subfolder (e.g. `app/`) so the dev watcher only needs to observe that
+ * folder instead of the entire project root.
+ */
+export const SRC_DIR = path.resolve(PROJECT_ROOT, _vexConfig.srcDir || ".");
+
+/**
+ * Set of directory *names* (not paths) that the dev file watcher will skip
+ * when scanning for .vex changes.
+ *
+ * The check is applied to every segment of the changed file's relative path,
+ * so a directory named "dist" is ignored regardless of nesting depth.
+ *
+ * Built-in ignored directories (always excluded):
+ *   - Build outputs:        dist, build, out, .output
+ *   - Framework generated:  .vexjs, public
+ *   - Dependencies:         node_modules
+ *   - Version control:      .git, .svn
+ *   - Test coverage:        coverage, .nyc_output
+ *   - Other fw caches:      .next, .nuxt, .svelte-kit, .astro
+ *   - Misc:                 tmp, temp, .cache, .claude
+ *
+ * Extended via `watchIgnore` in vex.config.json.
+ */
+export const WATCH_IGNORE = new Set([
+  // build outputs
+  "dist", "build", "out", ".output",
+  // framework generated
+  ".vexjs", "public",
+  // dependencies
+  "node_modules",
+  // vcs
+  ".git", ".svn",
+  // test coverage
+  "coverage", ".nyc_output",
+  // other framework caches
+  ".next", ".nuxt", ".svelte-kit", ".astro",
+  // misc
+  "tmp", "temp", ".cache", ".claude",
+  // user-defined extras from vex.config.json
+  ...(_vexConfig.watchIgnore || []),
+]);
+
+export const PAGES_DIR = path.resolve(SRC_DIR, "pages");
 export const SERVER_APP_DIR = path.join(FRAMEWORK_DIR, "server");
 export const CLIENT_DIR = path.join(FRAMEWORK_DIR, "client");
 export const CLIENT_SERVICES_DIR = path.join(CLIENT_DIR, "services");
@@ -98,10 +166,12 @@ export function adjustClientModulePath(modulePath, importStatement) {
   let relative = modulePath.replace(/^vex\//, "").replace(/^\.app\//, "");
   let adjustedPath = `/_vexjs/services/${relative}`;
 
-  // Auto-resolve directory → index.js
+  // Auto-resolve directory → index.js, bare name → .js
   const fsPath = path.join(CLIENT_SERVICES_DIR, relative);
   if (existsSync(fsPath) && statSync(fsPath).isDirectory()) {
     adjustedPath += "/index.js";
+  } else if (!path.extname(adjustedPath)) {
+    adjustedPath += ".js";
   }
 
   const adjustedImportStatement = importStatement.replace(modulePath, adjustedPath);
