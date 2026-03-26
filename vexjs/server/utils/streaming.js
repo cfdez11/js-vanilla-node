@@ -84,7 +84,7 @@ async function processServerComponents(html, serverComponents) {
     const replacements = [];
     let match;
 
-    while ((match = componentRegex.exec(html)) !== null) {
+    while ((match = componentRegex.exec(processedHtml)) !== null) {
       replacements.push({
         name: componentName,
         attrs: parseAttributes(match[1]),
