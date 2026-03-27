@@ -3,12 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "run-p dev:*",
-    "dev:server": "node --watch node_modules/vexjs/server/index.js",
+    "dev": "run-p dev:server dev:css",
+    "dev:server": "vex dev",
     "dev:css": "npx @tailwindcss/cli -i ./src/input.css -o ./public/styles.css --watch",
-    "build": "node node_modules/vexjs/server/prebuild.js",
+    "build": "vex build",
+    "build:static": "vex build:static",
     "build:css": "npx @tailwindcss/cli -i ./src/input.css -o ./public/styles.css --minify",
-    "start": "NODE_ENV=production node node_modules/vexjs/server/index.js"
+    "start": "vex start"
   },
   "dependencies": {
     "vexjs": "workspace:*"
