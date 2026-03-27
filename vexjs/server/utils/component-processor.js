@@ -1,10 +1,12 @@
 import { watch } from "fs";
 import path from "path";
+import esbuild from "esbuild";
 import { compileTemplateToHTML } from "./template.js";
-import { getOriginalRoutePath, getPageFiles, getRoutePath, saveClientComponentModule, saveClientRoutesFile, saveComponentHtmlDisk, saveServerRoutesFile, readFile, getImportData, generateComponentId, adjustClientModulePath, PAGES_DIR, ROOT_HTML_DIR, getLayoutPaths, SRC_DIR, WATCH_IGNORE, WATCH_IGNORE_FILES } from "./files.js";
+import { getOriginalRoutePath, getPageFiles, getRoutePath, saveClientComponentModule, saveClientRoutesFile, saveComponentHtmlDisk, saveServerRoutesFile, readFile, getImportData, generateComponentId, adjustClientModulePath, PAGES_DIR, ROOT_HTML_DIR, getLayoutPaths, SRC_DIR, WATCH_IGNORE, WATCH_IGNORE_FILES, CLIENT_COMPONENTS_DIR } from "./files.js";
 import { renderComponents } from "./streaming.js";
 import { getRevalidateSeconds } from "./cache.js";
 import { withCache } from "./data-cache.js";
+import { createVexAliasPlugin } from "./esbuild-plugin.js";
 
 /**
  * Throws a structured redirect error that propagates out of getData and is
@@ -107,7 +109,16 @@ if (process.env.NODE_ENV !== "production") {
         // 3. Notify connected browsers to reload
         hmrEmitter.emit("reload", filename);
       } else if (filename.endsWith(".js")) {
-        // User utility file changed — reload browsers (served dynamically, no bundle to regenerate)
+        // User utility .js file changed. Because esbuild inlines user files into
+        // each component bundle that imports them, a change to any utility requires
+        // re-bundling all components — we cannot know which bundles include this
+        // file without tracking the full import graph. Rebuilding all components
+        // is fast enough with esbuild (sub-millisecond per file).
+        try {
+          await generateComponentsAndFillCache();
+        } catch (e) {
+          console.error(`[HMR] Rebuild failed after ${filename} change:`, e.message);
+        }
         hmrEmitter.emit("reload", filename);
       }
     });
@@ -674,9 +685,22 @@ function convertVueToHtmlTagged(template, clientCode = "") {
 
   let result = template.trim();
 
+  // Self-closing x-for="item in items" → ${items.value.map(item => html`<Component ... />`)}
+  result = result.replace(
+    /<([\w-]+)([^>]*)\s+x-for="(\w+)\s+in\s+([^"]+)(?:\.value)?"([^>]*)\/>/g,
+    (_, tag, beforeAttrs, iterVar, arrayVar, afterAttrs) => {
+      const cleanExpr = arrayVar.trim();
+      const isSimpleVar = /^\w+$/.test(cleanExpr);
+      const arrayAccess = isSimpleVar && reactiveVars.has(cleanExpr)
+        ? `${cleanExpr}.value`
+        : cleanExpr;
+      return `\${${arrayAccess}.map(${iterVar} => html\`<${tag}${beforeAttrs}${afterAttrs} />\`)}`;
+    }
+  );
+
   // x-for="item in items" → ${items.value.map(item => html`...`)}
   result = result.replace(
-    /<(\w+)([^>]*)\s+x-for="(\w+)\s+in\s+([^"]+)(?:\.value)?"([^>]*)>([\s\S]*?)<\/\1>/g,
+    /<([\w-]+)([^>]*)\s+x-for="(\w+)\s+in\s+([^"]+)(?:\.value)?"([^>]*)>([\s\S]*?)<\/\1>/g,
     (_, tag, beforeAttrs, iterVar, arrayVar, afterAttrs, content) => {
       const cleanExpr = arrayVar.trim();
       const isSimpleVar = /^\w+$/.test(cleanExpr);
@@ -727,98 +751,41 @@ function convertVueToHtmlTagged(template, clientCode = "") {
 
 
 /**
- * Normalizes and deduplicates client-side ES module imports,
- * ensuring required framework imports are present.
+ * Generates and bundles a client-side JS module for a hydrated component using esbuild.
+ *
+ * Previously this function assembled the output by hand: it collected import statements,
+ * deduped them with getClientCodeImports, and concatenated everything into a JS string.
+ * That approach had two fundamental limitations:
+ *   1. npm package imports (bare specifiers like 'lodash') were left unresolved in the
+ *      output — the browser has no module resolver and would throw at runtime.
+ *   2. Transitive user utility files (@/utils/foo imported by @/utils/bar) were not
+ *      bundled; they were served on-the-fly at runtime by the /_vexjs/user/* handler,
+ *      adding an extra network round-trip per utility file on page load.
+ *
+ * With esbuild the entry source is passed via stdin and esbuild takes care of:
+ *   - Resolving and inlining @/ user imports and their transitive dependencies
+ *   - Resolving and bundling npm packages from node_modules
+ *   - Deduplicating shared modules across the bundle
+ *   - Writing the final ESM output directly to the destination file
+ *
+ * Framework singletons (vex/*, .app/*) are intentionally NOT bundled. They are
+ * marked external by the vex-aliases plugin so the browser resolves them at runtime
+ * from /_vexjs/services/, ensuring a single shared instance per page. Bundling them
+ * would give each component its own copy of reactive.js, breaking shared state.
  *
  * @async
- * @param {Record<string, {
- *   fileUrl: string,
- *   originalPath: string,
- *   importStatement: string
- * }>} clientImports
+ * @param {{
+ *   clientCode: string,
+ *   template: string,
+ *   metadata: object,
+ *   clientImports: Record<string, { originalImportStatement: string }>,
+ *   clientComponents: Map<string, any>,
+ *   componentFilePath: string,
+ *   componentName: string,
+ * }} params
  *
- * @param {Record<string, string[]>} [requiredImports]
- *
- * @returns {Promise<string[]>}
- * Clean import statements.
- */
-async function getClientCodeImports(
-  clientImports,
-  requiredImports = {
-    "/_vexjs/services/reactive.js": ["effect"],
-    "/_vexjs/services/html.js": ["html"],
-  }
-) {
-
-  // Create a unique set of import statements to avoid duplicates
-  const cleanImportsSet = new Set(
-    Object.values(clientImports).map((importData) => importData.importStatement)
-  );
-  const cleanImports = Array.from(cleanImportsSet);
-
-  for (const [modulePath, requiredModules] of Object.entries(requiredImports)) {
-    const importIndex = cleanImports.findIndex((imp) =>
-      new RegExp(`from\\s+['"]${modulePath}['"]`).test(imp)
-    );
-
-    if (importIndex === -1) {
-      cleanImports.push(
-        `import { ${requiredModules.join(", ")} } from '${modulePath}';`
-      );
-    } else {
-      // if import exists, ensure it includes all required symbols
-      const existingImport = cleanImports[importIndex];
-      const importMatch = existingImport.match(/\{([^}]+)\}/);
-
-      if (importMatch) {
-        const importedModules = importMatch[1].split(",").map((s) => s.trim());
-        // Determine which required modules are missing
-        const missingModules = requiredModules.filter(
-          (s) => !importedModules.includes(s)
-        );
-        if (missingModules.length > 0) {
-          // Add missing symbols and reconstruct the import statement
-          importedModules.push(...missingModules);
-          cleanImports[importIndex] = existingImport.replace(
-            /\{[^}]+\}/,
-            `{ ${importedModules.join(", ")} }`
-          );
-        }
-      } else {
-        // If no named imports, convert to named imports
-        cleanImports[importIndex] = `import { ${requiredModules.join(
-          ", "
-        )} } from '${modulePath}';`;
-      }
-    }
-  }
-
-  // Return the final list of import statements
-  return cleanImports;
-}
-
-/**
- * Generates a client-side JS module for a hydrated component.
- *
- * The module:
- * - Includes required imports
- * - Injects default props
- * - Exports metadata
- * - Exposes a hydration entry point
- *
- * @async
- * @param {string} clientCode
- * @param {string} template
- * @param {object} metadata
- * @param {Record<string, {
- *  fileUrl: string,
- *  originalPath: string,
- *  importStatement: string
- *  }>} clientImports
- * 
- *
- * @returns {Promise<string|null>}
- * Generated JS module code or null if no client code exists.
+ * @returns {Promise<null>}
+ * Always returns null — esbuild writes the bundle directly to disk.
  */
 export async function generateClientComponentModule({
   clientCode,
@@ -826,56 +793,96 @@ export async function generateClientComponentModule({
   metadata,
   clientImports,
   clientComponents,
+  componentFilePath,
+  componentName,
 }) {
+  if (!clientCode && !template) return null;
 
-  // Extract default props from xprops
+  // ── 1. Resolve default props from xprops() ─────────────────────────────────
   const defaults = extractVPropsDefaults(clientCode);
-
   const clientCodeWithProps = addComputedProps(clientCode, defaults);
 
-  // Remove xprops declaration and imports from client code
+  // ── 2. Build the function body: remove xprops declaration and import lines ──
+  // Imports are hoisted to module level in the entry source (step 4).
   const cleanClientCode = clientCodeWithProps
     .replace(/const\s+props\s*=\s*xprops\s*\([\s\S]*?\)\s*;?/g, "")
     .replace(/^\s*import\s+.*$/gm, "")
     .trim();
 
-  // Convert template
+  // ── 3. Convert Vue-like template syntax to html`` tagged template ───────────
   const convertedTemplate = convertVueToHtmlTagged(template, clientCodeWithProps);
+  const { html: processedHtml } = await renderComponents({ html: convertedTemplate, clientComponents });
 
-  const { html: processedHtml } = await renderComponents({
-    html: convertedTemplate,
-    clientComponents,
+  // ── 4. Collect module-level imports for the esbuild entry source ────────────
+  // Use originalImportStatement (the specifier as written by the developer, before
+  // any path rewriting). esbuild receives the original specifiers and the alias
+  // plugin translates them at bundle time — no pre-rewriting needed here.
+  const importLines = new Set(
+    Object.values(clientImports)
+      .map((ci) => ci.originalImportStatement)
+      .filter(Boolean)
+  );
+
+  // Ensure effect and html are always available in the component body.
+  // If the developer already imported them the alias plugin's deduplication
+  // in esbuild's module graph handles the overlap — no duplicate at runtime.
+  const hasEffect = [...importLines].some((l) => /\beffect\b/.test(l));
+  const hasHtml = [...importLines].some((l) => /\bhtml\b/.test(l));
+  if (!hasEffect) importLines.add("import { effect } from 'vex/reactive';");
+  if (!hasHtml) importLines.add("import { html } from 'vex/html';");
+
+  // ── 5. Assemble the esbuild entry source ────────────────────────────────────
+  // This is a valid ESM module that esbuild will bundle. Imports at the top,
+  // hydrateClientComponent exported as a named function.
+  const entrySource = `
+${[...importLines].join("\n")}
+
+export const metadata = ${JSON.stringify(metadata)};
+
+export function hydrateClientComponent(marker, incomingProps = {}) {
+  ${cleanClientCode}
+
+  let root = null;
+  function render() {
+    const node = html\`${processedHtml}\`;
+    if (!root) {
+      root = node;
+      marker.replaceWith(node);
+    } else {
+      root.replaceWith(node);
+      root = node;
+    }
+  }
+
+  effect(() => render());
+  return root;
+}
+`.trim();
+
+  // ── 6. Bundle with esbuild ──────────────────────────────────────────────────
+  // stdin mode: esbuild receives the generated source as a virtual file.
+  // resolveDir tells esbuild which directory to use when resolving relative
+  // imports — it must be the .vex source file's directory so that './utils/foo'
+  // resolves relative to where the developer wrote the import, not relative to
+  // the framework's internal directories.
+  const outfile = path.join(CLIENT_COMPONENTS_DIR, `${componentName}.js`);
+
+  await esbuild.build({
+    stdin: {
+      contents: entrySource,
+      resolveDir: componentFilePath ? path.dirname(componentFilePath) : CLIENT_COMPONENTS_DIR,
+    },
+    bundle: true,
+    outfile,
+    format: "esm",
+    platform: "browser",
+    plugins: [createVexAliasPlugin()],
+    // Silence esbuild's default stdout logging — the framework has its own output
+    logLevel: "silent",
   });
 
-  const cleanImports = await getClientCodeImports(clientImports);
-
-  const clientComponentModule = `
-    ${cleanImports.join("\n")}  
-
-    export const metadata = ${JSON.stringify(metadata)}
-    
-    export function hydrateClientComponent(marker, incomingProps = {}) {
-      ${cleanClientCode}
-      
-      let root = null;
-      function render() {
-        const node = html\`${processedHtml}\`;
-        if (!root) {
-          root = node;
-          marker.replaceWith(node);
-        } else {
-          root.replaceWith(node);
-          root = node;
-        }
-      }
-
-      effect(() => render());
-
-      return root;
-    }
-  `;
-
-  return clientComponentModule.trim();
+  // esbuild wrote directly to outfile — no string to return
+  return null;
 }
 
 /**
@@ -994,10 +1001,36 @@ export async function processClientComponent(componentName, originalPath, props 
   const targetId = `client-${componentName}-${Date.now()}`;
 
   const componentImport = generateComponentId(originalPath)
-  const propsJson = JSON.stringify(props);
+  const propsJson = serializeClientComponentProps(props);
   const html = `<template id="${targetId}" data-client:component="${componentImport}" data-client:props='${propsJson}'></template>`;
   
   return html;
+}
+
+function isTemplateExpression(value) {
+  return typeof value === "string" && /^\$\{[\s\S]+\}$/.test(value.trim());
+}
+
+function serializeRuntimePropValue(value) {
+  if (!isTemplateExpression(value)) {
+    return JSON.stringify(value);
+  }
+
+  return value.trim().slice(2, -1).trim();
+}
+
+function serializeClientComponentProps(props = {}) {
+  const hasDynamicValues = Object.values(props).some(isTemplateExpression);
+
+  if (!hasDynamicValues) {
+    return JSON.stringify(props);
+  }
+
+  const serializedEntries = Object.entries(props).map(([key, value]) => {
+    return `${JSON.stringify(key)}: ${serializeRuntimePropValue(value)}`;
+  });
+
+  return `\${JSON.stringify({ ${serializedEntries.join(", ")} })}`;
 }
 
 /**
@@ -1142,22 +1175,24 @@ function fillRoute(route, params) {
   });
 }
 /**
- * 
- * Generates js module and save it in public directory.
- * 
+ * Generates and saves the client-side JS bundle for a component.
+ *
+ * Delegates to generateClientComponentModule, which uses esbuild to bundle
+ * the component's <script client> code into a self-contained ESM file written
+ * directly to .vexjs/_components/<componentName>.js.
+ *
+ * componentFilePath is required so esbuild can resolve relative imports
+ * (./utils/foo) from the correct base directory.
+ *
  * @param {{
- *  metadata: object,
- *  clientCode: string,
- *  template: string,
- *  clientImports: Record<string, {
- *    fileUrl: string,
- *    originalPath: string,
- *    importStatement: string
- * }>,
- *  clientComponents: Record<string, any>,
- *  componentName: string,
- * }} 
- * 
+ *   metadata: object,
+ *   clientCode: string,
+ *   template: string,
+ *   clientImports: Record<string, { originalImportStatement: string }>,
+ *   clientComponents: Map<string, any>,
+ *   componentName: string,
+ *   componentFilePath: string,
+ * }} params
  * @returns {Promise<void>}
  */
 async function saveClientComponent({
@@ -1167,18 +1202,17 @@ async function saveClientComponent({
   clientImports,
   clientComponents,
   componentName,
+  componentFilePath,
 }) {
-  const jsModuleCode = await generateClientComponentModule({
+  await generateClientComponentModule({
     metadata,
     clientCode,
     template,
     clientImports,
     clientComponents,
+    componentFilePath,
+    componentName,
   });
-
-  if (jsModuleCode) {
-    await saveClientComponentModule(componentName, jsModuleCode)
-  }
 }
 
 /**x
@@ -1250,6 +1284,7 @@ async function generateComponentAndFillCache(filePath) {
           clientImports,
           clientComponents,
           componentName: generateComponentId(cacheKey),
+          componentFilePath: filePath,
         }))
       }
     }
@@ -1263,6 +1298,7 @@ async function generateComponentAndFillCache(filePath) {
       clientImports,
       clientComponents,
       componentName: generateComponentId(urlPath),
+      componentFilePath: filePath,
     }))
   }
 

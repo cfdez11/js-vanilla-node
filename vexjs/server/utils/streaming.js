@@ -30,19 +30,20 @@ import {
  */
 function parseAttributes(rawAttrs) {
   const attrs = {};
-  const regex = /:(\w+)=['"]([^'"]+)['"]|@(\w+)=['"]([^'"]+)['"]|(\w+)=['"]([^'"]+)['"]/g;
+  const regex =
+    /:([\w-]+)=(?:"([^"]*)"|'([^']*)')|@([\w-]+)=(?:"([^"]*)"|'([^']*)')|([\w:-]+)=(?:"([^"]*)"|'([^']*)')/g;
   let match;
   
   while ((match = regex.exec(rawAttrs)) !== null) {
     if (match[1]) {
       // Dynamic prop :prop
-      attrs[match[1]] = match[2];
-    } else if (match[3]) {
+      attrs[match[1]] = match[2] ?? match[3] ?? "";
+    } else if (match[4]) {
       // Event handler @event
-      attrs[match[3]] = match[4];
-    } else if (match[5]) {
+      attrs[match[4]] = match[5] ?? match[6] ?? "";
+    } else if (match[7]) {
       // Static prop
-      attrs[match[5]] = match[6];
+      attrs[match[7]] = match[8] ?? match[9] ?? "";
     }
   }
 
