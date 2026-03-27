@@ -1,0 +1,11 @@
+<script client>
+  import { useCounter } from "@/utils/counter";
+
+  const { counter } = useCounter();
+</script>
+<template>
+  <div class="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-4 py-1">
+    <span class="text-sm font-medium text-blue-700">Counter:</span>
+    <span class="text-sm font-bold text-blue-900">{{counter}}</span>
+  </div>
+</template>

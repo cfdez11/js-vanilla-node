@@ -1,4 +1,5 @@
-import { reactive, computed, effect } from "/_vexjs/services/reactive.js"
+import { useCounter } from "/_vexjs/user/utils/counter.js"
+import { effect } from '/_vexjs/services/reactive.js';
 import { html } from '/_vexjs/services/html.js';  
 
     export const metadata = null
@@ -7,18 +8,9 @@ import { html } from '/_vexjs/services/html.js';
       /** @type {{ start: string }} */
   const props = { ...{"start":10}, ...incomingProps };
 
-  const counter = reactive(props.start);
+  const { counter, stars, increment, decrement } = useCounter();
 
-  function increment () {
-    counter.value++;
-  }
-
-  function decrement () {
-    counter.value--;
-  }
-
-
-  const stars = computed(() => Array.from({ length: counter.value }, () => "⭐"));
+  counter.value = props.start;
       
       let root = null;
       function render() {
@@ -26,13 +18,13 @@ import { html } from '/_vexjs/services/html.js';
     <div class="flex items-center gap-6">
       <button @click="${decrement}"
         class="flex items-center justify-center w-10 h-10 bg-red-500 hover:bg-red-600 text-white font-bold rounded-full transition-all duration-200 shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-        :disabled='${counter.value <= 0}'>
+        :disabled='${counter <= 0}'>
         Sub
       </button>
 
       <div class="flex flex-col items-center gap-2">
         <span class="text-4xl font-bold text-gray-800 min-w-[4rem] text-center">
-          ${counter.value}
+          ${counter}
         </span>
         <span class="text-sm text-gray-500 uppercase tracking-wide">
           Count
@@ -45,9 +37,9 @@ import { html } from '/_vexjs/services/html.js';
       </button>
     </div>
 
-    <div x-show="${counter.value}" class="flex items-center gap-1 ml-auto p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+    <div x-show="${counter}" class="flex items-center gap-1 ml-auto p-2 bg-yellow-50 rounded-lg border border-yellow-200">
       <div class="flex flex-wrap gap-1">
-        ${stars.value.map(star => html`<span class="text-yellow-500 text-lg">⭐</span>`)}
+        ${stars.map(star => html`<span class="text-yellow-500 text-lg">⭐</span>`)}
       </div>
     </div>
   </div>`;

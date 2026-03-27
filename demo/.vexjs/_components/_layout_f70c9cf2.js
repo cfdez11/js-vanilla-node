@@ -6,8 +6,6 @@ import { html } from '/_vexjs/services/html.js';
     export function hydrateClientComponent(marker, incomingProps = {}) {
       /** @type {{ children: node }} */
   const props = { ...{"children":null}, ...incomingProps };
-
-  console.warn('LAYOUT PAGES RENDERED');
       
       let root = null;
       function render() {
@@ -23,8 +21,9 @@ import { html } from '/_vexjs/services/html.js';
             </a>
           </h1>
 
-          <nav class="hidden md:block">
-            <ul class="flex space-x-8">
+          <nav class="hidden md:flex items-center gap-8">
+            <template id="client-NavCounter-1774617543733" data-client:component="_components_nav_counter_5ac9e880" data-client:props='{}'></template>
+            <ul class="flex space-x-8 items-center">
               <li>
                 <a class="text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200 border-b-2 border-transparent hover:border-blue-600 pb-1"
                   href="/">

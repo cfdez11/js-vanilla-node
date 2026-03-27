@@ -1,24 +1,14 @@
 <script client>
-  import { reactive, computed } from "vex/reactive";
+  import { useCounter } from "@/utils/counter";
 
   /** @type {{ start: string }} */
   const props = xprops({
     start: { default: 10 },
   });
 
-  const counter = reactive(props.start);
+  const { counter, stars, increment, decrement } = useCounter();
 
-  function increment () {
-    counter.value++;
-  }
-
-  function decrement () {
-    counter.value--;
-  }
-
-
-  const stars = computed(() => Array.from({ length: counter.value }, () => "⭐"));
-
+  counter.value = props.start;
 </script>
 <template>
   <div class="flex items-center justify-between gap-4 w-full">

@@ -1,11 +1,11 @@
 <script client>
+  import NavCounter from "components/nav-counter.vex";
 
   /** @type {{ children: node }} */
   const props = xprops({
     children: { default: null },
   });
 
-  console.warn('LAYOUT PAGES RENDERED');
 </script>
 <template>
   <div>
@@ -20,8 +20,9 @@
             </a>
           </h1>
 
-          <nav class="hidden md:block">
-            <ul class="flex space-x-8">
+          <nav class="hidden md:flex items-center gap-8">
+            <NavCounter />
+            <ul class="flex space-x-8 items-center">
               <li>
                 <a class="text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200 border-b-2 border-transparent hover:border-blue-600 pb-1"
                   href="/">
