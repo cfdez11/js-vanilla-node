@@ -85,9 +85,23 @@ export const WATCH_IGNORE = new Set([
   ".next", ".nuxt", ".svelte-kit", ".astro",
   // misc
   "tmp", "temp", ".cache", ".claude",
-  // user-defined extras from vex.config.json
-  ...(_vexConfig.watchIgnore || []),
+  // user-defined extras from vex.config.json.
+  // Simple names (no /, *, .) are treated as directory names here.
+  ...(_vexConfig.watchIgnore || []).filter(p => !/[\/\*\.]/.test(p)),
 ]);
+
+/**
+ * Glob patterns derived from `watchIgnore` entries in vex.config.json that
+ * contain path separators, wildcards, or dots — i.e. file-level patterns.
+ *
+ * Simple directory names in the same array go to WATCH_IGNORE instead.
+ *
+ *   "watchIgnore": ["utils/legacy.js", "components/wip/**", "wip"]
+ *   → "wip"               added to WATCH_IGNORE  (directory name)
+ *   → "utils/legacy.js"   added to WATCH_IGNORE_FILES (glob pattern)
+ *   → "components/wip/**" added to WATCH_IGNORE_FILES (glob pattern)
+ */
+export const WATCH_IGNORE_FILES = (_vexConfig.watchIgnore || []).filter(p => /[\/\*\.]/.test(p));
 
 export const PAGES_DIR = path.resolve(SRC_DIR, "pages");
 export const SERVER_APP_DIR = path.join(FRAMEWORK_DIR, "server");
@@ -158,11 +172,39 @@ export async function initializeDirectories() {
  * console.log(result.importStatement); 
  * // "import userController from '/.app/client/services/reactive.js';"
  */
-export function adjustClientModulePath(modulePath, importStatement) {
+export function adjustClientModulePath(modulePath, importStatement, componentFilePath = null) {
   if (modulePath.startsWith("/_vexjs/")) {
     return { path: modulePath, importStatement };
   }
 
+  // User imports — relative (e.g. "../utils/context") or @ alias (e.g. "@/utils/context")
+  // — served via /_vexjs/user/
+  const isRelative = (modulePath.startsWith("./") || modulePath.startsWith("../")) && componentFilePath;
+  const isAtAlias = modulePath.startsWith("@/") || modulePath === "@";
+  if (isRelative || isAtAlias) {
+    let resolvedPath;
+    if (isAtAlias) {
+      resolvedPath = path.resolve(SRC_DIR, modulePath.replace(/^@\//, "").replace(/^@$/, ""));
+    } else {
+      const componentDir = path.dirname(componentFilePath);
+      resolvedPath = path.resolve(componentDir, modulePath);
+    }
+    if (!path.extname(resolvedPath)) {
+      if (existsSync(resolvedPath + ".js")) {
+        resolvedPath += ".js";
+      } else if (existsSync(path.join(resolvedPath, "index.js"))) {
+        resolvedPath = path.join(resolvedPath, "index.js");
+      } else {
+        resolvedPath += ".js";
+      }
+    }
+    const relativePath = path.relative(SRC_DIR, resolvedPath).replace(/\\/g, "/");
+    const adjustedPath = `/_vexjs/user/${relativePath}`;
+    const adjustedImportStatement = importStatement.replace(modulePath, adjustedPath);
+    return { path: adjustedPath, importStatement: adjustedImportStatement };
+  }
+
+  // Framework imports (vex/ and .app/)
   let relative = modulePath.replace(/^vex\//, "").replace(/^\.app\//, "");
   let adjustedPath = `/_vexjs/services/${relative}`;
 

@@ -1,7 +1,7 @@
 import { watch } from "fs";
 import path from "path";
 import { compileTemplateToHTML } from "./template.js";
-import { getOriginalRoutePath, getPageFiles, getRoutePath, saveClientComponentModule, saveClientRoutesFile, saveComponentHtmlDisk, saveServerRoutesFile, readFile, getImportData, generateComponentId, adjustClientModulePath, PAGES_DIR, ROOT_HTML_DIR, getLayoutPaths, SRC_DIR, WATCH_IGNORE } from "./files.js";
+import { getOriginalRoutePath, getPageFiles, getRoutePath, saveClientComponentModule, saveClientRoutesFile, saveComponentHtmlDisk, saveServerRoutesFile, readFile, getImportData, generateComponentId, adjustClientModulePath, PAGES_DIR, ROOT_HTML_DIR, getLayoutPaths, SRC_DIR, WATCH_IGNORE, WATCH_IGNORE_FILES } from "./files.js";
 import { renderComponents } from "./streaming.js";
 import { getRevalidateSeconds } from "./cache.js";
 import { withCache } from "./data-cache.js";
@@ -83,8 +83,14 @@ if (process.env.NODE_ENV !== "production") {
   // Watch SRC_DIR (configured via vex.config.json `srcDir`, defaults to project root).
   // Skip any path segment that appears in WATCH_IGNORE to avoid reacting to
   // changes inside node_modules, build outputs, or other non-source directories.
+  // Individual file patterns can be excluded via `watchIgnoreFiles` in vex.config.json.
   watch(SRC_DIR, { recursive: true }, async (_, filename) => {
-      if (filename?.endsWith(".vex") && !filename.split(path.sep).some(part => WATCH_IGNORE.has(part))) {
+      if (!filename) return;
+      if (filename.split(path.sep).some(part => WATCH_IGNORE.has(part))) return;
+      const normalizedFilename = filename.replace(/\\/g, "/");
+      if (WATCH_IGNORE_FILES.some(pattern => path.matchesGlob(normalizedFilename, pattern))) return;
+
+      if (filename.endsWith(".vex")) {
         const fullPath = path.join(SRC_DIR, filename);
 
         // 1. Evict all in-memory caches for this file
@@ -99,6 +105,9 @@ if (process.env.NODE_ENV !== "production") {
         }
 
         // 3. Notify connected browsers to reload
+        hmrEmitter.emit("reload", filename);
+      } else if (filename.endsWith(".js")) {
+        // User utility file changed — reload browsers (served dynamically, no bundle to regenerate)
         hmrEmitter.emit("reload", filename);
       }
     });
@@ -145,7 +154,7 @@ const DEFAULT_METADATA = {
  *   }>
  * }>}
  */
-const getScriptImports = async (script, isClientSide = false) => {
+const getScriptImports = async (script, isClientSide = false, filePath = null) => {
   const componentRegistry = new Map();
   const imports = {};
   const clientImports = {};
@@ -182,21 +191,22 @@ const getScriptImports = async (script, isClientSide = false) => {
       }
     } else if (defaultImport) {
       // client side default imports and named imports
-      const adjustedClientModule = adjustClientModulePath(modulePath, importStatement);
+      const adjustedClientModule = adjustClientModulePath(modulePath, importStatement, filePath);
       clientImports[defaultImport || namedImports] = {
         fileUrl,
         originalPath: adjustedClientModule.path,
         importStatement: adjustedClientModule.importStatement,
+        originalImportStatement: importStatement,
       };
     } else {
       namedImports.split(",").forEach((name) => {
         const trimmedName = name.trim();
-        // if import module path is .app/file_name.js add .app/client/services/file_name.js
-      const adjustedClientModule = adjustClientModulePath(modulePath, importStatement);
+        const adjustedClientModule = adjustClientModulePath(modulePath, importStatement, filePath);
         clientImports[trimmedName] = {
-          fileUrl,      
+          fileUrl,
           originalPath: adjustedClientModule.path,
           importStatement: adjustedClientModule.importStatement,
+          originalImportStatement: importStatement,
         };
       });
     }
@@ -311,7 +321,7 @@ async function _processHtmlFile(filePath) {
   }
 
   if (clientMatch) {
-    const { componentRegistry, clientImports: newClientImports } = await getScriptImports(clientMatch[1], true);
+    const { componentRegistry, clientImports: newClientImports } = await getScriptImports(clientMatch[1], true, filePath);
     clientComponents = componentRegistry;
     clientImports = newClientImports;
   }
@@ -412,6 +422,7 @@ export async function renderHtmlFile(filePath, context = {}, extraComponentData 
  */
 function generateClientScriptTags({
   clientCode,
+  clientImports = {},
   clientComponentsScripts = [],
   clientComponents = new Map(),
 }) {
@@ -419,6 +430,13 @@ function generateClientScriptTags({
   // replace component imports to point to .js files
   for (const { importStatement } of clientComponents.values()) {
     clientCode = clientCode.replace(`${importStatement};`, '').replace(importStatement, "");
+  }
+
+  // Rewrite framework and user utility imports to browser-accessible paths
+  for (const importData of Object.values(clientImports)) {
+    if (importData.originalImportStatement && importData.importStatement !== importData.originalImportStatement) {
+      clientCode = clientCode.replace(importData.originalImportStatement, importData.importStatement);
+    }
   }
 
   const clientCodeWithoutComponentImports = clientCode
@@ -459,11 +477,12 @@ function generateClientScriptTags({
  * }>
  */
 async function renderPage(pagePath, ctx, awaitSuspenseComponents = false, extraComponentData = {}) {
-  const { 
-    html, 
-    metadata, 
-    clientCode, 
-    serverComponents, 
+  const {
+    html,
+    metadata,
+    clientCode,
+    clientImports,
+    serverComponents,
     clientComponents,
   } = await renderHtmlFile(pagePath, ctx, extraComponentData);
 
@@ -482,6 +501,7 @@ async function renderPage(pagePath, ctx, awaitSuspenseComponents = false, extraC
     html: htmlWithComponents,
     metadata,
     clientCode,
+    clientImports,
     serverComponents,
     clientComponents,
     suspenseComponents,
@@ -582,6 +602,7 @@ export async function renderPageWithLayout(pagePath, ctx = {}, awaitSuspenseComp
     html: pageHtml,
     metadata,
     clientCode,
+    clientImports,
     serverComponents,
     clientComponents,
     suspenseComponents,
@@ -592,6 +613,7 @@ export async function renderPageWithLayout(pagePath, ctx = {}, awaitSuspenseComp
   // Wrap in layout
   const clientScripts = generateClientScriptTags({
     clientCode,
+    clientImports,
     clientComponentsScripts,
     clientComponents,
   });
