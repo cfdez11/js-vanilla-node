@@ -125,10 +125,15 @@ export function createLayoutRenderer() {
       const layout = layoutsToRender[i];
       const mod = modules[i];
 
-      const children = htmlContainerNode;
-      const marker = document.createElement("template");
+      // Wrap children in a stable vex-root container so that when the layout
+      // re-renders due to reactive dependencies, props.children always points
+      // to the same node. patch() updates the container's content instead of
+      // replacing the node, so re-renders never restore stale page content.
+      const childrenWrapper = document.createElement("vex-root");
+      childrenWrapper.appendChild(htmlContainerNode);
 
-      htmlContainerNode = mod.hydrateClientComponent(marker, { children });
+      const marker = document.createElement("template");
+      htmlContainerNode = mod.hydrateClientComponent(marker, { children: childrenWrapper });
 
       if (!deepestMetadata && mod.metadata) {
         deepestMetadata = mod.metadata;
@@ -136,7 +141,7 @@ export function createLayoutRenderer() {
 
       renderedLayouts.set(layout.name, {
         name: layout.name,
-        children,
+        children: childrenWrapper,
         node: htmlContainerNode,
       });
     }
@@ -157,8 +162,10 @@ export function createLayoutRenderer() {
     const record = renderedLayouts.get(layoutId);
     if (!record) return;
 
-    record.children.replaceWith(node);
-    record.children = node;
+    // childrenWrapper is a stable vex-root node that stays in the DOM.
+    // Replacing its children updates the page content without the layout
+    // needing to re-render or props.children becoming stale.
+    record.children.replaceChildren(node);
   }
 
   /**
