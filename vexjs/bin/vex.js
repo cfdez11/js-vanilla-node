@@ -56,7 +56,7 @@ const commands = {
     spawn(
       "node",
       [path.join(serverDir, "build-static.js")],
-      { stdio: "inherit" }
+      { stdio: "inherit", env: { ...process.env, NODE_ENV: "production" } }
     ),
 };
 

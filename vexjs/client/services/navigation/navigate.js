@@ -1,4 +1,5 @@
 import { findRouteWithParams } from "./router.js";
+import { routes } from "../_routes.js";
 import { updateRouteParams } from "./use-route-params.js";
 import { renderPage } from "./render-page.js";
 import { renderSSRPage } from "./render-ssr.js";
@@ -34,7 +35,8 @@ export async function navigateInternal({
   updateRouteParams(path);
 
   const routePath = path.split("?")[0];
-  const { route } = findRouteWithParams(routePath);
+  const { route: matchedRoute } = findRouteWithParams(routePath);
+  const route = matchedRoute ?? routes.find((r) => r.isNotFound) ?? null;
 
   if (addToHistory) {
     history.pushState({}, "", path);
