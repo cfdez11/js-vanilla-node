@@ -1,20 +1,21 @@
 {
   "name": "@cfdez11/vex",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "description": "A vanilla JavaScript meta-framework with file-based routing, SSR/CSR/SSG/ISR and Vue-like reactivity",
   "type": "module",
-  "main": "./server/index.js",
+  "main": "./dist/server/index.js",
   "exports": {
-    ".": "./server/index.js"
+    ".": "./dist/server/index.js"
   },
   "bin": {
-    "vex": "./bin/vex.js"
+    "vex": "./dist/bin/vex.js"
   },
   "files": [
-    "bin",
-    "server",
-    "client"
+    "dist"
   ],
+  "scripts": {
+    "prepublishOnly": "node build-dist.js"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
