@@ -1,5 +1,5 @@
 <script client>
-  import NavCounter from "components/nav-counter.vex";
+  import NavCounter from "@/components/nav-counter.vex";
 
   /** @type {{ children: node }} */
   const props = xprops({

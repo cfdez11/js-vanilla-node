@@ -7,8 +7,8 @@
 </script>
 
 <script client>
-  import Weather from "components/weather/weather-state.vex";
-  import WeatherLinks from "components/weather/weather-links.vex";
+  import Weather from "@/components/weather/weather-state.vex";
+  import WeatherLinks from "@/components/weather/weather-links.vex";
 
   const links = [
     { href: '/page-csr/madrid', label: 'Madrid' },

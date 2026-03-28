@@ -7,8 +7,8 @@
 </script>
 
 <script client>
-  import Weather from "components/weather/weather-params.vex";
-  import WeatherLinks from "components/weather/weather-links.vex";
+  import Weather from "@/components/weather/weather-params.vex";
+  import WeatherLinks from "@/components/weather/weather-links.vex";
   import { useRouteParams } from "vex/navigation";
 
   const params = useRouteParams();

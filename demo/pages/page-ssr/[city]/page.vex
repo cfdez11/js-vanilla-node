@@ -1,5 +1,5 @@
 <script server>
-  import { delay } from "utils/delay.js";
+  import { delay } from "@/utils/delay.js";
 
   async function getStaticPaths() {
     return [

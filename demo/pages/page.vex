@@ -1,7 +1,7 @@
 <script server>
-  import UserCard from "components/user-card.vex";
-  import UserCardDelayed from "components/user-card-delayed.vex";
-  import UserCardSkeleton from "components/user-card-skeleton.vex";
+  import UserCard from "@/components/user-card.vex";
+  import UserCardDelayed from "@/components/user-card-delayed.vex";
+  import UserCardSkeleton from "@/components/user-card-skeleton.vex";
 
   async function getData () {
     return { userId: 123, name: "Alice", attributes: ["admin", "editor"] };
@@ -14,7 +14,7 @@
 </script>
 
 <script client>
-  import Counter from "components/counter.vex";
+  import Counter from "@/components/counter.vex";
 </script>
 
 <template>
