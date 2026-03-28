@@ -154,15 +154,23 @@ function processNode(node, scope, previousRendered = false) {
         const isSuspenseFallback =
           name === ":fallback" && node.name === "Suspense";
         const realName = name.slice(1);
-        attrs[realName] = !isSuspenseFallback
-          ? String(getDataValue(value, scope))
-          : value;
+        if (!isSuspenseFallback) {
+          const val = getDataValue(value, scope);
+          attrs[realName] = (val !== null && val !== undefined && typeof val === "object")
+            ? JSON.stringify(val)
+            : String(val ?? "");
+        } else {
+          attrs[realName] = value;
+        }
         delete attrs[name];
       }
 
       if (name.startsWith("x-bind:")) {
         const realName = name.slice(7);
-        attrs[realName] = String(getDataValue(value, scope));
+        const val = getDataValue(value, scope);
+        attrs[realName] = (val !== null && val !== undefined && typeof val === "object")
+          ? JSON.stringify(val)
+          : String(val ?? "");
         delete attrs[name];
       }
     }

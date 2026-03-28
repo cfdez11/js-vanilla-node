@@ -28,12 +28,20 @@ import {
  * //   id: 'my-component'
  * // }
  */
+function decodeAttrValue(raw) {
+  const decoded = raw.replace(/&quot;/g, '"');
+  if (decoded.startsWith("[") || decoded.startsWith("{")) {
+    try { return JSON.parse(decoded); } catch {}
+  }
+  return decoded;
+}
+
 function parseAttributes(rawAttrs) {
   const attrs = {};
   const regex =
     /:([\w-]+)=(?:"([^"]*)"|'([^']*)')|@([\w-]+)=(?:"([^"]*)"|'([^']*)')|([\w:-]+)=(?:"([^"]*)"|'([^']*)')/g;
   let match;
-  
+
   while ((match = regex.exec(rawAttrs)) !== null) {
     if (match[1]) {
       // Dynamic prop :prop
@@ -42,8 +50,8 @@ function parseAttributes(rawAttrs) {
       // Event handler @event
       attrs[match[4]] = match[5] ?? match[6] ?? "";
     } else if (match[7]) {
-      // Static prop
-      attrs[match[7]] = match[8] ?? match[9] ?? "";
+      // Static prop — decode &quot; and recover arrays/objects serialized by template.js
+      attrs[match[7]] = decodeAttrValue(match[8] ?? match[9] ?? "");
     }
   }
 
