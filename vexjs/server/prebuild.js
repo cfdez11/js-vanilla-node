@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { build } from "./utils/component-processor.js";
 import { initializeDirectories } from "./utils/files.js";
 
