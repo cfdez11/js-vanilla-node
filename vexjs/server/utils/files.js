@@ -112,7 +112,6 @@ const GENERATED_DIR = path.join(PROJECT_ROOT, ".vexjs");
 const CACHE_DIR = path.join(GENERATED_DIR, "_cache");
 export const CLIENT_COMPONENTS_DIR = path.join(GENERATED_DIR, "_components");
 export const USER_GENERATED_DIR = path.join(GENERATED_DIR, "user");
-const SERVER_UTILS_DIR = path.join(GENERATED_DIR);
 const ROOT_HTML_USER = path.join(PROJECT_ROOT, "root.html");
 const ROOT_HTML_DEFAULT = path.join(FRAMEWORK_DIR, "server", "root.html");
 export const ROOT_HTML_DIR = ROOT_HTML_USER;
@@ -134,13 +133,20 @@ export const ROOT_HTML_DIR = ROOT_HTML_USER;
  */
 export async function initializeDirectories() {
   try {
+    const servicesDir = path.join(GENERATED_DIR, "services");
     await Promise.all([
       fs.mkdir(GENERATED_DIR, { recursive: true }),
       fs.mkdir(CACHE_DIR, { recursive: true }),
       fs.mkdir(CLIENT_COMPONENTS_DIR, { recursive: true }),
       fs.mkdir(USER_GENERATED_DIR, { recursive: true }),
-      fs.mkdir(path.join(GENERATED_DIR, "services"), { recursive: true }),
+      fs.mkdir(servicesDir, { recursive: true }),
     ]);
+
+    // Copy framework client runtime files into .vexjs/services/ so they are
+    // served by the /_vexjs/services static route alongside generated files
+    // like _routes.js. Generated files (prefixed with _) are written later by
+    // the build step and overwrite any stale copies here.
+    await fs.cp(CLIENT_SERVICES_DIR, servicesDir, { recursive: true });
 
     return true;
   } catch (err) {

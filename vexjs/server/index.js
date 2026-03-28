@@ -29,8 +29,6 @@ if (process.env.NODE_ENV === "production") {
 const app = express();
 
 // Serve generated client component bundles at /_vexjs/_components/
-// Must be registered before the broader /_vexjs static mount below so that
-// .vexjs/_components/ takes priority over anything in CLIENT_DIR/_components/.
 app.use(
   "/_vexjs/_components",
   express.static(path.join(process.cwd(), ".vexjs", "_components"), {
@@ -42,9 +40,9 @@ app.use(
   })
 );
 
-// Serve generated services (e.g. _routes.js) at /_vexjs/services/
-// Also before the broader /_vexjs mount so the generated _routes.js
-// overrides any placeholder that might exist in the framework source.
+// Serve framework runtime JS + generated files (_routes.js) at /_vexjs/services/
+// initializeDirectories() pre-populates this dir with framework files; build()
+// adds generated files (_routes.js). Single source of truth for all /_vexjs/services/*.
 app.use(
   "/_vexjs/services",
   express.static(path.join(process.cwd(), ".vexjs", "services"), {
@@ -56,13 +54,13 @@ app.use(
   })
 );
 
-// Serve framework client runtime files at /_vexjs/
-// (reactive.js, html.js, hydrate.js, navigation/, etc.)
-// User imports like `vex/reactive` are marked external by esbuild and resolved
-// here at runtime — a single shared instance per page load.
+// Serve pre-bundled user JS utility files at /_vexjs/user/
+// Registered before the generic /_vexjs mount so requests don't fall through
+// to CLIENT_DIR unnecessarily. esbuild bundles each file with npm packages
+// inlined; vex/*, @/*, and relative user imports stay external (singletons).
 app.use(
-  "/_vexjs",
-  express.static(CLIENT_DIR, {
+  "/_vexjs/user",
+  express.static(USER_GENERATED_DIR, {
     setHeaders(res, filePath) {
       if (filePath.endsWith(".js")) {
         res.setHeader("Content-Type", "application/javascript");
@@ -71,15 +69,12 @@ app.use(
   })
 );
 
-
-// Serve pre-bundled user JS utility files at /_vexjs/user/
-// These are @/ and relative imports in <script client> blocks. esbuild bundles
-// each file with npm packages inlined; vex/*, @/*, and relative user imports
-// stay external so every component shares the same singleton module instance
-// via the browser's ES module cache.
+// Serve static framework assets (favicon.ico, app.webmanifest) from CLIENT_DIR.
+// Runtime JS files (reactive.js, index.js, etc.) are already in .vexjs/services/
+// via initializeDirectories() and are served by the /_vexjs/services route above.
 app.use(
-  "/_vexjs/user",
-  express.static(USER_GENERATED_DIR, {
+  "/_vexjs",
+  express.static(CLIENT_DIR, {
     setHeaders(res, filePath) {
       if (filePath.endsWith(".js")) {
         res.setHeader("Content-Type", "application/javascript");

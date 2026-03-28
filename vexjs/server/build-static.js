@@ -46,24 +46,36 @@ const frameworkScripts = [
 shell = shell.replace("</head>", `  ${frameworkScripts}\n</head>`);
 await fs.writeFile(path.join(DIST_DIR, "index.html"), shell, "utf-8");
 
-// Step 4: Copy framework client files → dist/_vexjs/
-console.log("📦 Copying framework client files...");
-await fs.cp(CLIENT_DIR, path.join(DIST_DIR, "_vexjs"), { recursive: true });
+// Step 4: Copy static framework assets (favicon.ico, app.webmanifest) → dist/_vexjs/
+// JS runtime files live in .vexjs/services/ (copied in step 5) — no need to
+// copy CLIENT_DIR/services/ separately.
+console.log("📦 Copying framework assets...");
+for (const asset of ["favicon.ico", "app.webmanifest"]) {
+  try {
+    await fs.copyFile(
+      path.join(CLIENT_DIR, asset),
+      path.join(DIST_DIR, "_vexjs", asset)
+    );
+  } catch {
+    // asset not present — skip
+  }
+}
 
-// Step 5: Copy generated component bundles → dist/_vexjs/_components/
+// Step 5: Copy generated services → dist/_vexjs/services/
+// .vexjs/services/ already contains both framework JS (copied by initializeDirectories)
+// and generated files (_routes.js). One copy covers everything.
+console.log("📦 Copying services...");
+await fs.cp(
+  path.join(GENERATED_DIR, "services"),
+  path.join(DIST_DIR, "_vexjs", "services"),
+  { recursive: true }
+);
+
+// Step 6: Copy generated component bundles → dist/_vexjs/_components/
 console.log("📦 Copying component bundles...");
 await fs.cp(
   path.join(GENERATED_DIR, "_components"),
   path.join(DIST_DIR, "_vexjs", "_components"),
-  { recursive: true }
-);
-
-// Step 6: Copy generated services (includes _routes.js) → dist/_vexjs/services/
-// This overwrites the framework-level services dir copy with the generated routes
-console.log("📦 Copying generated services...");
-await fs.cp(
-  path.join(GENERATED_DIR, "services"),
-  path.join(DIST_DIR, "_vexjs", "services"),
   { recursive: true }
 );
 
@@ -77,7 +89,7 @@ try {
   // no user JS files — that's fine
 }
 
-// Step 8: Copy public/ → dist/ (static assets, CSS)
+// Step 8: Copy public/ → dist/
 console.log("📦 Copying public assets...");
 const publicDir = path.join(PROJECT_ROOT, "public");
 try {
@@ -86,7 +98,7 @@ try {
   // no public/ directory — that's fine
 }
 
-// Step 9: Copy pre-rendered HTML for SSG routes (revalidate: 'never')
+// Step 9: Copy pre-rendered SSG pages
 const CACHE_DIR = path.join(GENERATED_DIR, "_cache");
 const ssgRoutes = serverRoutes.filter(
   (r) => r.meta.revalidate === "never" || r.meta.revalidate === false
@@ -108,7 +120,7 @@ if (ssgRoutes.length > 0) {
   }
 }
 
-// Step 10: Report SSR-only routes that were skipped
+// Step 10: Report SSR-only routes (skipped in static build)
 const ssrOnlyRoutes = serverRoutes.filter((r) => r.meta.ssr);
 if (ssrOnlyRoutes.length > 0) {
   console.warn("\n⚠️  The following routes require a server and were NOT included in the static build:");
