@@ -135,4 +135,6 @@ console.log("✅ Static build complete! Output: dist/");
 console.log("\nTo serve locally:  npx serve dist");
 console.log("Static host note:  configure your host to serve dist/index.html for all 404s (SPA fallback).");
 
+process.exit(0);
+
 
