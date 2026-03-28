@@ -78,12 +78,12 @@
   // Start observing the document for new nodes
   observer.observe(document, { childList: true, subtree: true });
 
-  // Hydrate existing components on DOMContentLoaded or immediately if already interactive
+  // Hydrate existing components on DOMContentLoaded or immediately if already interactive.
+  // The observer is intentionally NOT disconnected here — it must stay active to catch
+  // components inserted after DOMContentLoaded (nested CSR components, Suspense streaming,
+  // SPA navigations). The `data-hydrated` guard in hydrateMarker prevents double-hydration.
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      hydrateComponents();
-      observer.disconnect();
-    });
+    document.addEventListener("DOMContentLoaded", () => hydrateComponents());
   } else {
     hydrateComponents();
   }
