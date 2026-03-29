@@ -62,5 +62,9 @@ export async function navigateInternal({
     await renderPage({ route, layoutRenderer });
   } finally {
     onFinish();
+    const hash = path.includes("#") ? path.slice(path.indexOf("#") + 1) : null;
+    if (hash) {
+      document.getElementById(hash)?.scrollIntoView();
+    }
   }
 }

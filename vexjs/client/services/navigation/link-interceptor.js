@@ -33,6 +33,9 @@ export function setupLinkInterceptor(navigate) {
       return;
     }
 
+    // Same-page hash navigation — let the browser handle it natively
+    if (url.pathname === window.location.pathname && url.hash) return;
+
     event.preventDefault();
     navigate(url.pathname + url.hash);
   });
