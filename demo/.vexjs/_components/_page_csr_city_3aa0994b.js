@@ -34,8 +34,8 @@ function hydrateClientComponent(marker, incomingProps = {}) {
         </p>
       </div>
     </header>
-    <template id="client-Weather-1774706734488" data-client:component="_components_weather_weather_params_a4d2cb74" data-client:props='{}'></template>
-    <template id="client-WeatherLinks-1774706734489" data-client:component="_components_weather_weather_links_376a02a5" data-client:props='${JSON.stringify({ "links": links.filter((link) => !link.href.includes(cityParam)) })}'></template>
+    <template id="client-Weather-1774774388604" data-client:component="_components_weather_weather_params_a4d2cb74" data-client:props='{}'></template>
+    <template id="client-WeatherLinks-1774774388604" data-client:component="_components_weather_weather_links_376a02a5" data-client:props='${JSON.stringify({ "links": links.filter((link) => !link.href.includes(cityParam)) })}'></template>
   </div>`;
     wrapper.replaceChildren(node);
   }

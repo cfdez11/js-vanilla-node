@@ -1,10 +1,10 @@
 {
   "name": "@cfdez11/vex",
-  "version": "0.10.9",
+  "version": "0.10.10",
   "description": "A vanilla JavaScript meta-framework with file-based routing, SSR/CSR/SSG/ISR and Vue-like reactivity",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tu-usuario/vexjs"
+    "url": "https://github.com/@cfdez11/vexjs"
   },
   "homepage": "https://www.vexjs.com/",
   "type": "module",
