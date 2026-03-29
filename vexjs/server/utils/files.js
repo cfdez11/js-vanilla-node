@@ -874,12 +874,16 @@ export async function getImportData(importPath, callerFilePath = null) {
     // Without this, `import Foo from './foo.vex'` inside a nested component would be
     // resolved from the project root instead of from the file that contains the import.
     resolvedPath = path.resolve(path.dirname(callerFilePath), importPath);
+  } else if (!importPath.startsWith(".") && !importPath.startsWith("/")) {
+    // Bare specifier: Node.js built-in (fs, path, fs/promises, etc.) or npm package.
+    // Return the specifier as-is so `import(fileUrl)` works correctly.
+    return { path: importPath, fileUrl: importPath, importPath };
   } else {
     resolvedPath = path.resolve(ROOT_DIR, importPath);
   }
 
   // Auto-resolve directory → index.js
-  if (existsSync(resolvedPath) && statSync(resolvedPath).isDirectory()) {
+  if (resolvedPath && existsSync(resolvedPath) && statSync(resolvedPath).isDirectory()) {
     resolvedPath = path.join(resolvedPath, "index.js");
   }
 
